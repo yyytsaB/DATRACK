@@ -40,6 +40,8 @@ This skill defines the technical architecture, strict constraints, domain logic,
 
 > **Test Device & Carrier Verification Note**: The primary test device for this build uses the developer's Smart SIM. Real usage metrics during development must be validated against actual Smart Communications promo terms. Note that device-level `NetworkStatsManager` queries capture all device mobile traffic without distinguishing zero-rated or app-specific promo buckets (e.g., dedicated YouTube/TikTok allocations in Giga bundles vs. open-access data). If a tracked promo features unmetered or app-restricted buckets, flag this in UI messaging to ensure forecast transparency and accuracy honesty.
 
+> **Multi-Bucket & Split Allowances Note**: For promos featuring split allowances (e.g., Smart Magic Data offerings with separate 5G-only and open-access/general pools), v1 tracks only the primary/larger general pool as the promo's allowance. Smaller specialized buckets (e.g., 5G-specific data allocations) are out of scope and not tracked. This is a deliberate scope decision, not a limitation to revisit for v1.
+
 ### V1 Scope Discipline & Feature Boundaries
 This is a **portfolio showcase project** demonstrating clean architectural design, algorithmic clarity, and modern Android development practices. Keep the initial release lean and strictly within scope.
 
@@ -47,6 +49,7 @@ This is a **portfolio showcase project** demonstrating clean architectural desig
 | :--- | :--- |
 | Single carrier primary focus (**Smart Communications**) | Multi-carrier auto-detection rules & deferred telco bundles (Globe, DITO) |
 | Manual promo configuration (GigaSurf, Magic Data, Power All, Smart Bro) | `NotificationListenerService` telco SMS auto-sync |
+| Single primary allowance tracking per promo (general open-access pool) | Multi-bucket split pool tracking (e.g., 5G-specific bonus allowances, app-specific bundles) |
 | Device-level mobile data tracking (excludes WiFi) | Cloud sync, Firebase, remote backends, User auth |
 | Burn-rate forecast engine & plain-English ETA | In-App purchases, ads, monetization logic |
 | Daily mobile usage breakdown graph | Telco USSD dialer automations / accessibility scrapers |
@@ -54,15 +57,15 @@ This is a **portfolio showcase project** demonstrating clean architectural desig
 | Jetpack Glance home screen widget | Wear OS / Android Auto extensions |
 | Basic Dual-SIM support (manual toggle between 2 promo contexts, device-total usage — not simultaneous per-SIM attribution) | Complex family/shared pool tracking |
 
-> **Agent Enforcement Rule**: If a requested feature belongs in the "Out of Scope" list (e.g., backend sync, telco notification listener, monetization, full multi-carrier parsing), explicitly remind the user that it exceeds v1 scope before writing any code.
+> **Agent Enforcement Rule**: If a requested feature belongs in the "Out of Scope" list (e.g., backend sync, telco notification listener, monetization, full multi-carrier parsing, multi-bucket split tracking), explicitly remind the user that it exceeds v1 scope before writing any code.
 
 ---
 
 ## 2. Core Feature Specifications (v1)
 
 ### 1. Manual Promo Configuration
-- **Model**: Promo Name (e.g., Smart GigaSurf 99, Magic Data 399, Power All 99), Total Data Allowance (MB/GB converted to Bytes internally), Promo Start Date/Time, Validity Duration (hours/days), Target SIM Slot (SIM 1 / SIM 2).
-- **Validation**: Ensure start timestamp is not in the future, allowance is positive, and expiration date is strictly after start date.
+- **Model**: Promo Name (e.g., Smart GigaSurf 99, Magic Data 399, Power All 99), Total Data Allowance (MB/GB converted to Bytes internally), Promo Start Date/Time, Optional Expiration Date/Time (`Long?`, null for non-expiring promos like Smart Magic Data), Target SIM Slot (SIM 1 / SIM 2).
+- **Validation**: Ensure start timestamp is not in the future, allowance is positive, and if an expiration timestamp is provided, it must be strictly after the start timestamp. A null expiration is valid and treated as "never expires / data-cap only".
 
 ### 2. Mobile Data Measurement Layer
 - Query `NetworkStatsManager.querySummaryForDevice(ConnectivityManager.TYPE_MOBILE, subscriberId, startTime, endTime)`, passing an empty string for `subscriberId` to retrieve aggregate device-wide mobile data usage. Do not attempt to retrieve a real `subscriberId`/IMSI — this is restricted on Android 10+ for non-carrier-privileged apps, per the dual-SIM constraint note above.
@@ -73,18 +76,18 @@ This is a **portfolio showcase project** demonstrating clean architectural desig
 ### 3. Burn-Rate Forecast Engine
 - **Calculations**:
   - **Elapsed Time**: $T_{elapsed} = \text{currentTime} - \text{startTime}$
-  - **Total Validity**: $T_{total} = \text{expirationTime} - \text{startTime}$
-  - **Time Remaining**: $T_{rem} = \text{expirationTime} - \text{currentTime}$
   - **Data Consumed**: $D_{used}$ (queried from `NetworkStatsManager` within $[startTime, currentTime]$)
   - **Data Remaining**: $D_{rem} = D_{total} - D_{used}$
   - **Average Burn Rate**: $R_{burn} = \frac{D_{used}}{T_{elapsed}}$ (Bytes per hour/minute)
   - **Estimated Depletion Time**: $T_{depletion} = \text{currentTime} + \frac{D_{rem}}{R_{burn}}$
-  - **Burn Status Index**: Ratio of data consumed percentage to time elapsed percentage ($\frac{D_{used} / D_{total}}{T_{elapsed} / T_{total}}$).
+  - **Time Validity (Conditional on Expiration)**:
+    - If `expirationTime != null`: $T_{total} = \text{expirationTime} - \text{startTime}$, $T_{rem} = \text{expirationTime} - \text{currentTime}$.
+    - **Burn Status Index**: Ratio of data consumed percentage to time elapsed percentage ($\frac{D_{used} / D_{total}}{T_{elapsed} / T_{total}}$). Applicable only when promo has an expiration window.
 - **Plain-Language Output**:
-  - *"At current pace, Smart GigaSurf 99 data will run out on Tuesday at 4:15 PM (18 hours before promo expires)."*
-  - *"Pace is optimal: 2.1 GB remaining on Smart Magic Data with 3 days left."*
-  - *"Depleted! Smart Power All promo has 0 MB remaining."*
-- **Mathematical Safety**: Guard against division by zero (e.g., $T_{elapsed} \to 0$ right after activation or $R_{burn} = 0$). Provide graceful fallback estimates (e.g., linear baseline distribution over promo window).
+  - *Expiring Promos*: *"At current pace, Smart GigaSurf 99 data will run out on Tuesday at 4:15 PM (18 hours before promo expires)."*
+  - *Non-Expiring Promos (e.g. Smart Magic Data)*: *"At current pace, Smart Magic Data will run out on Tuesday at 4:15 PM."* (without expiration comparison).
+  - *Depleted*: *"Depleted! Smart Power All promo has 0 MB remaining."*
+- **Mathematical Safety**: Guard against division by zero (e.g., $T_{elapsed} \to 0$ right after activation or $R_{burn} = 0$). Provide graceful fallback estimates (e.g., linear baseline distribution over promo window when expiring, or baseline daily allocation for non-expiring promos).
 
 ### 4. Glance Home Screen Widget
 - Compact and Medium Glance widget layouts showing:
@@ -137,3 +140,4 @@ app/src/main/java/com/loadpredictor/
 2. **Commented Algorithm Rationales**: Document domain math extensively. For example, explain weighted moving averages vs. cumulative burn rate, edge-case dampening (first 2 hours of a promo), and manual active promo indexing.
 3. **Data Immutability & StateFlow**: Expose UI state via immutable data classes and `StateFlow` from `ViewModel` layers.
 4. **Byte Precision**: Store all allowances and usage figures internally in raw **Bytes** (`Long`), formatting to MB/GB only in presentation mappers.
+5. **Deterministic Time Abstraction**: The domain and forecast engine layers must avoid hardcoded `System.currentTimeMillis()` calls. Use an injectable time provider interface (`TimeProvider` / `Clock`) or explicit timestamp parameters in domain methods, engines, and use cases to ensure 100% deterministic mathematical unit testing across all scenarios.

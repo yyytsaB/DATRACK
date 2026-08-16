@@ -12,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -53,7 +54,7 @@ class PromoDaoTest {
             name = "Smart Magic Data 399",
             totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
             startTimestamp = 2000L,
-            expirationTimestamp = 8000L,
+            expirationTimestamp = null, // Non-expiring promo
             simSlot = SimSlot.SIM_1,
             isActive = false
         )
@@ -103,6 +104,7 @@ class PromoDaoTest {
         assertNotNull(activePromo)
         assertEquals(2L, activePromo?.id)
         assertEquals("Smart Magic Data 399", activePromo?.name)
+        assertNull(activePromo?.expirationTimestamp) // Confirms null expiration preserved in Room
     }
 
     @Test

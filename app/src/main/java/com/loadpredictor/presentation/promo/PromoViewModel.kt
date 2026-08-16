@@ -73,7 +73,7 @@ class PromoViewModel(
         name: String,
         allowanceBytes: Long,
         startTimestamp: Long,
-        expirationTimestamp: Long,
+        expirationTimestamp: Long?,
         simSlot: SimSlot = SimSlot.SIM_1,
         isActive: Boolean = true,
         id: Long = 0L,

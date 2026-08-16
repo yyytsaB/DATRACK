@@ -10,6 +10,7 @@ import com.loadpredictor.domain.model.SimSlot
  * Room entity representation of a prepaid mobile data promo.
  *
  * Store allowances in raw bytes ([totalAllowanceBytes]) for mathematical precision.
+ * [expirationTimestamp] is nullable to support non-expiring promos (e.g., Smart Magic Data).
  */
 @Entity(tableName = "promos")
 data class PromoEntity(
@@ -26,7 +27,7 @@ data class PromoEntity(
     val startTimestamp: Long,
 
     @ColumnInfo(name = "expiration_timestamp")
-    val expirationTimestamp: Long,
+    val expirationTimestamp: Long? = null,
 
     @ColumnInfo(name = "sim_slot")
     val simSlot: SimSlot = SimSlot.SIM_1,

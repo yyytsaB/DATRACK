@@ -5,16 +5,17 @@ import com.loadpredictor.data.local.entity.toEntity
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.SimSlot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PromoEntityMappingTest {
 
     @Test
-    fun `Promo toEntity and toDomain round trip preserves all properties`() {
+    fun `Expiring Promo toEntity and toDomain round trip preserves all properties`() {
         val domain = Promo(
             id = 42L,
-            name = "Smart Magic Data 399",
-            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            name = "Smart GigaSurf 99",
+            totalAllowanceBytes = 2L * 1024L * 1024L * 1024L,
             startTimestamp = 1700000000000L,
             expirationTimestamp = 1800000000000L,
             simSlot = SimSlot.SIM_2,
@@ -24,8 +25,8 @@ class PromoEntityMappingTest {
         val entity = domain.toEntity()
 
         assertEquals(42L, entity.id)
-        assertEquals("Smart Magic Data 399", entity.name)
-        assertEquals(24L * 1024L * 1024L * 1024L, entity.totalAllowanceBytes)
+        assertEquals("Smart GigaSurf 99", entity.name)
+        assertEquals(2L * 1024L * 1024L * 1024L, entity.totalAllowanceBytes)
         assertEquals(1700000000000L, entity.startTimestamp)
         assertEquals(1800000000000L, entity.expirationTimestamp)
         assertEquals(SimSlot.SIM_2, entity.simSlot)
@@ -33,6 +34,30 @@ class PromoEntityMappingTest {
 
         val restoredDomain = entity.toDomain()
         assertEquals(domain, restoredDomain)
+    }
+
+    @Test
+    fun `Non-expiring Promo toEntity and toDomain round trip preserves null expiration`() {
+        val domain = Promo(
+            id = 99L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = 1700000000000L,
+            expirationTimestamp = null,
+            simSlot = SimSlot.SIM_1,
+            isActive = true
+        )
+
+        val entity = domain.toEntity()
+
+        assertEquals(99L, entity.id)
+        assertEquals("Smart Magic Data 399", entity.name)
+        assertNull(entity.expirationTimestamp)
+
+        val restoredDomain = entity.toDomain()
+        assertEquals(domain, restoredDomain)
+        assertNull(restoredDomain.expirationTimestamp)
+        assertEquals(true, restoredDomain.isNoExpiry)
     }
 
     @Test
