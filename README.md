@@ -87,13 +87,24 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 ## Roadmap
 
 ### v1 — MVP (in progress)
-- [ ] Manual promo entry (name, allowance, validity, start date)
-- [ ] Device-level mobile data tracking (mobile only, WiFi excluded)
+
+**Phase 1 — Foundation (complete)**
+- [x] Room persistence layer for promos (entity, DAO, repository)
+- [x] Device-level mobile data measurement (`NetworkStatsManager` wrapper,
+      mobile-only, empty-string subscriberId workaround)
+- [x] Usage Access permission check + explicit "not granted" UI state
+- [x] StateFlow-driven ViewModel architecture (`MainViewModel`, `PromoViewModel`)
+- [x] Distinct handling for "permission denied" vs. "genuine zero usage"
+      (`UsageAccessDeniedException`)
+- [x] Unit + instrumented test coverage for the above, verified on-device
+
+**Remaining v1 feature work (UI + logic on top of the Phase 1 foundation)**
+- [ ] Manual promo entry screen (data model + save logic done; entry form UI pending)
 - [ ] Burn-rate forecast engine with plain-language output
 - [ ] Daily usage graph (last 7–30 days)
 - [ ] Threshold-based local notifications (50% / 80% / 90%)
 - [ ] Home screen widget (Glance) — remaining data + time, pace status
-- [ ] Manual dual-SIM toggle between two promo contexts
+- [ ] Manual dual-SIM toggle UI (single-active-promo logic done and tested; toggle screen pending)
 - [ ] Forecast engine unit tests (zero-usage, boundary, over-100%, zero-burn-rate cases)
 
 ### v2 — deferred, not started
@@ -123,7 +134,9 @@ forecast to function and is requested explicitly with context, not silently.
 ## Status
 
 Actively in development as a portfolio project. Built and tested against a
-real Smart Communications prepaid SIM.
+real Smart Communications prepaid SIM. Phase 1 (data foundation) is complete
+and verified on-device; Phase 2 (forecast engine + promo management UI) is
+in progress.
 
 ## License
 
