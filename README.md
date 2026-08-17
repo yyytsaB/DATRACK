@@ -83,6 +83,11 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
   gives free data to specific apps (common in Smart Giga bundles), device-wide
   usage tracking can't separate that from general data — the forecast is an
   estimate, and the UI says so.
+- **Mid-cycle / starting-balance offset.** For users who install the app
+  partway through an active promo (e.g. Magic Data with partial balance
+  remaining), the app allows entering current remaining balance at setup.
+  The engine calculates the historical consumed offset and anchors live
+  velocity tracking strictly to device measurements from that point forward.
 
 ## Roadmap
 
@@ -98,14 +103,21 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
       (`UsageAccessDeniedException`)
 - [x] Unit + instrumented test coverage for the above, verified on-device
 
-**Remaining v1 feature work (UI + logic on top of the Phase 1 foundation)**
-- [ ] Manual promo entry screen (data model + save logic done; entry form UI pending)
-- [ ] Burn-rate forecast engine with plain-language output
+**Phase 2 — Forecast Engine & Promo Management UI (complete)**
+- [x] Burn-rate forecast engine with plain-language output (`BurnRateEngine`,
+      `GetActiveBurnForecastUseCase` — implemented, unit tested, verified
+      on-device across Calibrating/On-Track/etc. pace states)
+- [x] Manual promo entry screen (`PromoEntryDialog`, `PromoManagementScreen` —
+      full UI implemented, including presets and remaining-balance input)
+- [x] Manual dual-SIM toggle UI (implemented and verified switching active
+      context between SIM 1/SIM 2 on-device)
+- [x] Forecast engine unit tests (zero-usage, boundary, over-100%,
+      zero-burn-rate cases — all covered in `BurnRateEngineTest`)
+
+**Remaining v1 feature work (UI + background services)**
 - [ ] Daily usage graph (last 7–30 days)
 - [ ] Threshold-based local notifications (50% / 80% / 90%)
 - [ ] Home screen widget (Glance) — remaining data + time, pace status
-- [ ] Manual dual-SIM toggle UI (single-active-promo logic done and tested; toggle screen pending)
-- [ ] Forecast engine unit tests (zero-usage, boundary, over-100%, zero-burn-rate cases)
 
 ### v2 — deferred, not started
 - [ ] Notification-listener-based auto balance detection
@@ -134,9 +146,10 @@ forecast to function and is requested explicitly with context, not silently.
 ## Status
 
 Actively in development as a portfolio project. Built and tested against a
-real Smart Communications prepaid SIM. Phase 1 (data foundation) is complete
-and verified on-device; Phase 2 (forecast engine + promo management UI) is
-in progress.
+real Smart Communications prepaid SIM on physical hardware (Samsung Galaxy A22 5G / SM-A226B).
+Phase 1 (data foundation) and Phase 2 (forecast engine + promo management UI)
+are complete and verified on-device; remaining v1 work is the usage graph,
+notifications, and widget.
 
 ## License
 
