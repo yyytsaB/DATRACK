@@ -94,7 +94,9 @@ class PromoViewModel(
                 val savedId = savePromoUseCase(promo)
                 onSuccess(savedId)
             } catch (e: Exception) {
-                onError(e.localizedMessage ?: "Failed to save promo")
+                val msg = e.localizedMessage ?: "Failed to save promo"
+                _uiState.update { it.copy(errorMessage = msg) }
+                onError(msg)
             }
         }
     }
@@ -103,6 +105,16 @@ class PromoViewModel(
         viewModelScope.launch {
             promoRepository.setActivePromo(promoId)
         }
+    }
+
+    fun deletePromo(promo: Promo) {
+        viewModelScope.launch {
+            promoRepository.deletePromo(promo)
+        }
+    }
+
+    fun clearErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
     companion object {

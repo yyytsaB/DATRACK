@@ -88,28 +88,6 @@ class PromoTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `non-expiring promo with future start timestamp throws IllegalArgumentException`() {
-        val futureStart = System.currentTimeMillis() + 500_000L
-        Promo(
-            name = "Smart Magic Data Future",
-            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
-            startTimestamp = futureStart,
-            expirationTimestamp = null
-        )
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun `expiring promo with future start timestamp throws IllegalArgumentException`() {
-        val futureStart = System.currentTimeMillis() + 500_000L
-        Promo(
-            name = "Smart GigaSurf Future",
-            totalAllowanceBytes = 2L * 1024L * 1024L * 1024L,
-            startTimestamp = futureStart,
-            expirationTimestamp = futureStart + 100_000L
-        )
-    }
-
-    @Test(expected = IllegalArgumentException::class)
     fun `expiring promo with expiration before start throws IllegalArgumentException`() {
         Promo(
             name = "Invalid Dates",

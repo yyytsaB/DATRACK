@@ -8,6 +8,10 @@ package com.loadpredictor.domain.model
  *
  * Non-expiring promos (such as Smart Magic Data) have a `null` [expirationTimestamp].
  *
+ * Structural invariants (name, positive allowance, valid date order) are validated in [init].
+ * Temporal validation (e.g., ensuring start timestamp is not in the future) is enforced
+ * in the use-case layer via injected TimeProvider, keeping this model pure and deterministic.
+ *
  * @property id Unique identifier (auto-generated in persistence).
  * @property name Commercial name of the promo (e.g., "Smart GigaSurf 99", "Smart Magic Data 399").
  * @property totalAllowanceBytes Total data allowance in bytes (must be > 0).
@@ -28,7 +32,6 @@ data class Promo(
     init {
         require(name.isNotBlank()) { "Promo name must not be blank" }
         require(totalAllowanceBytes > 0) { "Total allowance must be greater than 0 bytes" }
-        require(startTimestamp <= System.currentTimeMillis()) { "Start timestamp cannot be in the future" }
         if (expirationTimestamp != null) {
             require(expirationTimestamp > startTimestamp) {
                 "Expiration timestamp must be after start timestamp"

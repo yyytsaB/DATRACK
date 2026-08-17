@@ -5,6 +5,7 @@ import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.domain.model.UsageBucket
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.repository.UsageRepository
+import com.loadpredictor.domain.time.TimeProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -12,10 +13,15 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UseCasesTest {
+
+    private class FakeTimeProvider(var currentTime: Long = 1_000_000L) : TimeProvider {
+        override fun currentTimeMillis(): Long = currentTime
+    }
 
     private class FakePromoRepository : PromoRepository {
         private val promos = mutableListOf<Promo>()
@@ -86,8 +92,9 @@ class UseCasesTest {
     @Test
     fun `GetActivePromoUseCase and SavePromoUseCase manage active promo correctly`() = runTest {
         val repo = FakePromoRepository()
+        val timeProvider = FakeTimeProvider(currentTime = 10_000L)
         val getActive = GetActivePromoUseCase(repo)
-        val savePromo = SavePromoUseCase(repo)
+        val savePromo = SavePromoUseCase(repo, timeProvider)
 
         assertNull(getActive().first())
 
@@ -122,5 +129,49 @@ class UseCasesTest {
         val newActive = getActive().first()
         assertEquals("Smart Power All 99", newActive?.name)
         assertEquals(2L, newActive?.id)
+    }
+
+    @Test
+    fun `SavePromoUseCase rejects expiring promo with future start timestamp`() = runTest {
+        val repo = FakePromoRepository()
+        val timeProvider = FakeTimeProvider(currentTime = 500_000L)
+        val savePromo = SavePromoUseCase(repo, timeProvider)
+
+        val futurePromo = Promo(
+            name = "Smart GigaSurf Future",
+            totalAllowanceBytes = 2L * 1024L * 1024L * 1024L,
+            startTimestamp = 600_000L, // in the future relative to 500_000L
+            expirationTimestamp = 900_000L
+        )
+
+        var thrown: IllegalArgumentException? = null
+        try {
+            savePromo(futurePromo)
+        } catch (e: IllegalArgumentException) {
+            thrown = e
+        }
+        assertEquals("Promo start timestamp cannot be in the future", thrown?.message)
+    }
+
+    @Test
+    fun `SavePromoUseCase rejects non-expiring promo with future start timestamp`() = runTest {
+        val repo = FakePromoRepository()
+        val timeProvider = FakeTimeProvider(currentTime = 500_000L)
+        val savePromo = SavePromoUseCase(repo, timeProvider)
+
+        val futurePromo = Promo(
+            name = "Smart Magic Data Future",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = 600_000L, // in the future relative to 500_000L
+            expirationTimestamp = null
+        )
+
+        var thrown: IllegalArgumentException? = null
+        try {
+            savePromo(futurePromo)
+        } catch (e: IllegalArgumentException) {
+            thrown = e
+        }
+        assertEquals("Promo start timestamp cannot be in the future", thrown?.message)
     }
 }

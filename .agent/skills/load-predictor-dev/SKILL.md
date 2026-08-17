@@ -83,7 +83,13 @@ This is a **portfolio showcase project** demonstrating clean architectural desig
   - **Time Validity (Conditional on Expiration)**:
     - If `expirationTime != null`: $T_{total} = \text{expirationTime} - \text{startTime}$, $T_{rem} = \text{expirationTime} - \text{currentTime}$.
     - **Burn Status Index**: Ratio of data consumed percentage to time elapsed percentage ($\frac{D_{used} / D_{total}}{T_{elapsed} / T_{total}}$). Applicable only when promo has an expiration window.
-- **Plain-Language Output**:
+    - **Pace Categorization Thresholds**:
+      - $\text{Index} > 1.25$ ($\ge 25\%$ faster than linear pace): `BURNING_FAST` (projected to deplete before expiration).
+      - $0.75 \le \text{Index} \le 1.25$ (within $\pm 25\%$ of linear pace): `ON_TRACK` (pace aligns with validity window).
+      - $\text{Index} < 0.75$ ($\ge 25\%$ slower than linear pace): `CONSERVATIVE` (projected to have surplus data at expiration).
+- **Stabilization Window & Mathematical Safety**:
+  - **Stabilization Window ($T_{elapsed} < 1\text{ hour}$)**: During the initial hour of a new promo, high burst usage or zero usage can distort burn rates. Flag pace as `INSUFFICIENT_DATA` (Calibrating). For expiring promos, project depletion against the baseline validity window; for non-expiring promos, defer date projection until sufficient usage history is established.
+  - **Division by Zero Guards**: Explicitly guard against $T_{elapsed} \le 0$, $R_{burn} == 0$, $D_{total} \le 0$, or $T_{total} \le 0$.
   - *Expiring Promos*: *"At current pace, Smart GigaSurf 99 data will run out on Tuesday at 4:15 PM (18 hours before promo expires)."*
   - *Non-Expiring Promos (e.g. Smart Magic Data)*: *"At current pace, Smart Magic Data will run out on Tuesday at 4:15 PM."* (without expiration comparison).
   - *Depleted*: *"Depleted! Smart Power All promo has 0 MB remaining."*

@@ -1,10 +1,12 @@
 package com.loadpredictor.presentation
 
+import com.loadpredictor.domain.model.BurnForecastResult
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.repository.UsageRepository
 import com.loadpredictor.domain.usecase.CheckUsagePermissionUseCase
+import com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase
 import com.loadpredictor.domain.usecase.GetActivePromoUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,7 +45,7 @@ class MainViewModelTest {
 
     private val fakeUsageRepository = object : UsageRepository {
         override fun hasUsageAccess(): Boolean = hasPermission
-        override suspend fun queryMobileUsageBytes(startTime: Long, endTime: Long): Long = 0L
+        override suspend fun queryMobileUsageBytes(startTime: Long, endTime: Long): Long = 100_000L
         override suspend fun queryDailyUsageBreakdown(startTime: Long, endTime: Long) = emptyList<com.loadpredictor.domain.model.UsageBucket>()
     }
 
@@ -58,20 +60,23 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `initial state reflects permission status and observes active promo`() = runTest {
+    fun `initial state reflects permission status and observes active promo and forecast`() = runTest {
         hasPermission = false
         val checkUsagePermissionUseCase = CheckUsagePermissionUseCase(fakeUsageRepository)
         val getActivePromoUseCase = GetActivePromoUseCase(fakePromoRepository)
+        val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(fakePromoRepository, fakeUsageRepository)
 
         val viewModel = MainViewModel(
             checkUsagePermissionUseCase = checkUsagePermissionUseCase,
-            getActivePromoUseCase = getActivePromoUseCase
+            getActivePromoUseCase = getActivePromoUseCase,
+            getActiveBurnForecastUseCase = getActiveBurnForecastUseCase
         )
 
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isUsagePermissionGranted)
         assertNull(viewModel.uiState.value.activePromo)
+        assertEquals(BurnForecastResult.NoActivePromo, viewModel.uiState.value.forecastResult)
         assertFalse(viewModel.uiState.value.isLoading)
 
         // Simulate promo activation
@@ -89,6 +94,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(promo, viewModel.uiState.value.activePromo)
+        assertTrue(viewModel.uiState.value.forecastResult is BurnForecastResult.Success)
 
         // Simulate permission granted on return from settings
         hasPermission = true
