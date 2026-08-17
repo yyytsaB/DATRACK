@@ -46,6 +46,7 @@ class PromoDaoTest {
             totalAllowanceBytes = 2L * 1024L * 1024L * 1024L,
             startTimestamp = 1000L,
             expirationTimestamp = 5000L,
+            initialUsageOffsetBytes = 0L,
             simSlot = SimSlot.SIM_1,
             isActive = false
         )
@@ -55,6 +56,7 @@ class PromoDaoTest {
             totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
             startTimestamp = 2000L,
             expirationTimestamp = null, // Non-expiring promo
+            initialUsageOffsetBytes = 4L * 1024L * 1024L * 1024L, // 4 GB offset
             simSlot = SimSlot.SIM_1,
             isActive = false
         )
@@ -64,6 +66,7 @@ class PromoDaoTest {
             totalAllowanceBytes = 8L * 1024L * 1024L * 1024L,
             startTimestamp = 3000L,
             expirationTimestamp = 9000L,
+            initialUsageOffsetBytes = 0L,
             simSlot = SimSlot.SIM_2,
             isActive = false
         )
@@ -105,6 +108,7 @@ class PromoDaoTest {
         assertEquals(2L, activePromo?.id)
         assertEquals("Smart Magic Data 399", activePromo?.name)
         assertNull(activePromo?.expirationTimestamp) // Confirms null expiration preserved in Room
+        assertEquals(4L * 1024L * 1024L * 1024L, activePromo?.initialUsageOffsetBytes) // Confirms offset preserved
     }
 
     @Test

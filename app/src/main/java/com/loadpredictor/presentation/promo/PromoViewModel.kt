@@ -74,6 +74,7 @@ class PromoViewModel(
         allowanceBytes: Long,
         startTimestamp: Long,
         expirationTimestamp: Long?,
+        initialUsageOffsetBytes: Long = 0L,
         simSlot: SimSlot = SimSlot.SIM_1,
         isActive: Boolean = true,
         id: Long = 0L,
@@ -88,6 +89,7 @@ class PromoViewModel(
                     totalAllowanceBytes = allowanceBytes,
                     startTimestamp = startTimestamp,
                     expirationTimestamp = expirationTimestamp,
+                    initialUsageOffsetBytes = initialUsageOffsetBytes,
                     simSlot = simSlot,
                     isActive = isActive
                 )

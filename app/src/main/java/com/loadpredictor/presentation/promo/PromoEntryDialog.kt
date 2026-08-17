@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,7 +46,8 @@ enum class DataUnit(val multiplier: Long, val label: String) {
 }
 
 /**
- * Material 3 Dialog for creating or customizing a mobile data promo.
+ * Material 3 Dialog for creating or customizing a mobile data promo,
+ * with support for entering current remaining balance to derive historical usage offset.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -58,6 +58,7 @@ fun PromoEntryDialog(
         allowanceBytes: Long,
         startTimestamp: Long,
         expirationTimestamp: Long?,
+        initialUsageOffsetBytes: Long,
         simSlot: SimSlot,
         isActive: Boolean
     ) -> Unit
@@ -66,6 +67,8 @@ fun PromoEntryDialog(
     var promoName by remember { mutableStateOf("") }
     var allowanceValueStr by remember { mutableStateOf("") }
     var selectedUnit by remember { mutableStateOf(DataUnit.GB) }
+    var remainingValueStr by remember { mutableStateOf("") }
+    var remainingUnit by remember { mutableStateOf(DataUnit.GB) }
     var isNoExpiry by remember { mutableStateOf(false) }
     var durationDaysStr by remember { mutableStateOf("7") }
     var selectedSimSlot by remember { mutableStateOf(SimSlot.SIM_1) }
@@ -78,6 +81,7 @@ fun PromoEntryDialog(
         val gb = preset.allowanceBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
         allowanceValueStr = if (gb >= 1.0) gb.toInt().toString() else (preset.allowanceBytes / (1024 * 1024)).toString()
         selectedUnit = if (gb >= 1.0) DataUnit.GB else DataUnit.MB
+        // Retain remainingValueStr as typed by the user to respect their intended balance
         isNoExpiry = (preset.durationDays == null)
         durationDaysStr = preset.durationDays?.toString() ?: ""
         selectedSimSlot = preset.defaultSimSlot
@@ -160,7 +164,7 @@ fun PromoEntryDialog(
                             allowanceValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
                             validationError = null
                         },
-                        label = { Text("Allowance") },
+                        label = { Text("Total Allowance") },
                         placeholder = { Text("24") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -178,6 +182,48 @@ fun PromoEntryDialog(
                             )
                         }
                     }
+                }
+
+                // Current remaining balance input (to derive starting usage offset)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = remainingValueStr,
+                            onValueChange = {
+                                remainingValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                validationError = null
+                            },
+                            label = { Text("Current remaining balance (optional)") },
+                            placeholder = { Text("e.g. 20") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            DataUnit.entries.forEach { unit ->
+                                FilterChip(
+                                    selected = (remainingUnit == unit),
+                                    onClick = { remainingUnit = unit },
+                                    label = { Text(unit.label) }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Check your current data balance via the Smart app or *123# and enter it here — we'll calculate how much you've already used.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 // No-expiry switch
@@ -285,12 +331,29 @@ fun PromoEntryDialog(
                                 validationError = "Promo name cannot be blank."
                                 return@Button
                             }
-                            val num = allowanceValueStr.toDoubleOrNull()
-                            if (num == null || num <= 0.0) {
+                            val numAllowance = allowanceValueStr.toDoubleOrNull()
+                            if (numAllowance == null || numAllowance <= 0.0) {
                                 validationError = "Please enter a valid positive allowance."
                                 return@Button
                             }
-                            val allowanceBytes = (num * selectedUnit.multiplier).toLong()
+                            val allowanceBytes = (numAllowance * selectedUnit.multiplier).toLong()
+
+                            // Compute offset from entered remaining balance
+                            val initialOffsetBytes = if (remainingValueStr.isNotBlank()) {
+                                val remainingNum = remainingValueStr.toDoubleOrNull()
+                                if (remainingNum == null || remainingNum < 0.0) {
+                                    validationError = "Current remaining balance cannot be negative."
+                                    return@Button
+                                }
+                                val remainingBytes = (remainingNum * remainingUnit.multiplier).toLong()
+                                if (remainingBytes > allowanceBytes) {
+                                    validationError = "Remaining balance cannot exceed total allowance."
+                                    return@Button
+                                }
+                                allowanceBytes - remainingBytes
+                            } else {
+                                0L
+                            }
 
                             val now = System.currentTimeMillis()
                             val expirationTimestamp: Long? = if (!isNoExpiry) {
@@ -309,6 +372,7 @@ fun PromoEntryDialog(
                                 allowanceBytes,
                                 now,
                                 expirationTimestamp,
+                                initialOffsetBytes,
                                 selectedSimSlot,
                                 setAsActive
                             )

@@ -18,6 +18,7 @@ class PromoEntityMappingTest {
             totalAllowanceBytes = 2L * 1024L * 1024L * 1024L,
             startTimestamp = 1700000000000L,
             expirationTimestamp = 1800000000000L,
+            initialUsageOffsetBytes = 1024L * 1024L * 250L,
             simSlot = SimSlot.SIM_2,
             isActive = true
         )
@@ -29,6 +30,7 @@ class PromoEntityMappingTest {
         assertEquals(2L * 1024L * 1024L * 1024L, entity.totalAllowanceBytes)
         assertEquals(1700000000000L, entity.startTimestamp)
         assertEquals(1800000000000L, entity.expirationTimestamp)
+        assertEquals(1024L * 1024L * 250L, entity.initialUsageOffsetBytes)
         assertEquals(SimSlot.SIM_2, entity.simSlot)
         assertEquals(true, entity.isActive)
 
@@ -37,13 +39,14 @@ class PromoEntityMappingTest {
     }
 
     @Test
-    fun `Non-expiring Promo toEntity and toDomain round trip preserves null expiration`() {
+    fun `Non-expiring Promo toEntity and toDomain round trip preserves null expiration and offset`() {
         val domain = Promo(
             id = 99L,
             name = "Smart Magic Data 399",
             totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
             startTimestamp = 1700000000000L,
             expirationTimestamp = null,
+            initialUsageOffsetBytes = 4L * 1024L * 1024L * 1024L,
             simSlot = SimSlot.SIM_1,
             isActive = true
         )
@@ -53,6 +56,7 @@ class PromoEntityMappingTest {
         assertEquals(99L, entity.id)
         assertEquals("Smart Magic Data 399", entity.name)
         assertNull(entity.expirationTimestamp)
+        assertEquals(4L * 1024L * 1024L * 1024L, entity.initialUsageOffsetBytes)
 
         val restoredDomain = entity.toDomain()
         assertEquals(domain, restoredDomain)

@@ -234,6 +234,72 @@ class BurnRateEngineTest {
     }
 
     @Test
+    fun `remaining balance entry conversion to initial usage offset calculates correct remaining data and depletion`() {
+        val start = 1_000_000L
+        val totalAllowance = 24L * 1024L * 1024L * 1024L // 24 GB total promo
+        val currentRemainingEntered = 20L * 1024L * 1024L * 1024L // User checks *123# and enters 20 GB remaining
+        val initialOffset = totalAllowance - currentRemainingEntered // 4 GB offset
+
+        assertEquals(4L * 1024L * 1024L * 1024L, initialOffset)
+
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = totalAllowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = initialOffset
+        )
+
+        // Elapsed: 10 hours of app tracking
+        // Live device measured usage during these 10 hours: 2 GB (Burn rate = 0.2 GB / hr)
+        // Total data used: 4 GB (historical) + 2 GB (live) = 6 GB
+        // Remaining data: 24 GB - 6 GB = 18 GB
+        // Projected depletion: 18 GB / 0.2 GB/hr = 90 hours
+        val current = start + 10 * 3_600_000L
+        val liveUsed = 2L * 1024L * 1024L * 1024L
+
+        val forecast = engine.calculateForecast(promo, liveUsed, current)
+
+        assertEquals(6L * 1024L * 1024L * 1024L, forecast.dataUsedBytes)
+        assertEquals(18L * 1024L * 1024L * 1024L, forecast.dataRemainingBytes)
+        assertEquals(2L * 1024L * 1024L * 1024L / 10.0, forecast.burnRateBytesPerHour, 1.0)
+        assertEquals(current + 90 * 3_600_000L, forecast.estimatedDepletionTimestamp)
+        assertEquals(BurnPace.ON_TRACK, forecast.pace)
+    }
+
+    @Test
+    fun `full allowance remaining entered converts to zero offset`() {
+        val totalAllowance = 24L * 1024L * 1024L * 1024L
+        val remainingEntered = 24L * 1024L * 1024L * 1024L
+        val offset = totalAllowance - remainingEntered
+        assertEquals(0L, offset)
+    }
+
+    @Test
+    fun `zero remaining entered converts to full allowance offset and marks depleted`() {
+        val start = 1_000_000L
+        val allowance = 10L * 1024L * 1024L * 1024L
+        val remainingEntered = 0L
+        val offset = allowance - remainingEntered
+        assertEquals(allowance, offset)
+
+        val promo = Promo(
+            name = "Fully Used",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = offset
+        )
+
+        val forecast = engine.calculateForecast(promo, 0L, start)
+
+        assertEquals(allowance, forecast.dataUsedBytes)
+        assertEquals(0L, forecast.dataRemainingBytes)
+        assertTrue(forecast.isDepleted)
+        assertEquals(BurnPace.DEPLETED, forecast.pace)
+    }
+
+    @Test
     fun `formatBytes formats correctly for GB and MB`() {
         assertEquals("2.0 GB", engine.formatBytes(2L * 1024L * 1024L * 1024L))
         assertEquals("500 MB", engine.formatBytes(500L * 1024L * 1024L))

@@ -8,15 +8,19 @@ package com.loadpredictor.domain.model
  *
  * Non-expiring promos (such as Smart Magic Data) have a `null` [expirationTimestamp].
  *
- * Structural invariants (name, positive allowance, valid date order) are validated in [init].
+ * [initialUsageOffsetBytes] represents historical data already consumed prior to the promo being
+ * registered in the app. It serves as an immutable one-time baseline anchor.
+ *
+ * Structural invariants (name, positive allowance, valid date order, valid offset bounds) are validated in [init].
  * Temporal validation (e.g., ensuring start timestamp is not in the future) is enforced
  * in the use-case layer via injected TimeProvider, keeping this model pure and deterministic.
  *
  * @property id Unique identifier (auto-generated in persistence).
  * @property name Commercial name of the promo (e.g., "Smart GigaSurf 99", "Smart Magic Data 399").
  * @property totalAllowanceBytes Total data allowance in bytes (must be > 0).
- * @property startTimestamp Epoch timestamp in milliseconds when promo began.
+ * @property startTimestamp Epoch timestamp in milliseconds when promo began tracking in the app.
  * @property expirationTimestamp Epoch timestamp in milliseconds when promo expires, or null for no-expiry promos.
+ * @property initialUsageOffsetBytes Historical bytes consumed before tracking began (0 <= offset <= totalAllowanceBytes).
  * @property simSlot The SIM slot associated with this promo (SIM_1 or SIM_2).
  * @property isActive Whether this promo is currently the active forecasting context.
  */
@@ -26,12 +30,17 @@ data class Promo(
     val totalAllowanceBytes: Long,
     val startTimestamp: Long,
     val expirationTimestamp: Long? = null,
+    val initialUsageOffsetBytes: Long = 0L,
     val simSlot: SimSlot = SimSlot.SIM_1,
     val isActive: Boolean = true
 ) {
     init {
         require(name.isNotBlank()) { "Promo name must not be blank" }
         require(totalAllowanceBytes > 0) { "Total allowance must be greater than 0 bytes" }
+        require(initialUsageOffsetBytes >= 0) { "Initial usage offset must be non-negative" }
+        require(initialUsageOffsetBytes <= totalAllowanceBytes) {
+            "Initial usage offset cannot exceed total allowance"
+        }
         if (expirationTimestamp != null) {
             require(expirationTimestamp > startTimestamp) {
                 "Expiration timestamp must be after start timestamp"

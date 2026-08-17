@@ -11,6 +11,7 @@ import com.loadpredictor.domain.model.SimSlot
  *
  * Store allowances in raw bytes ([totalAllowanceBytes]) for mathematical precision.
  * [expirationTimestamp] is nullable to support non-expiring promos (e.g., Smart Magic Data).
+ * [initialUsageOffsetBytes] stores the starting baseline data consumed prior to tracking.
  */
 @Entity(tableName = "promos")
 data class PromoEntity(
@@ -29,6 +30,9 @@ data class PromoEntity(
     @ColumnInfo(name = "expiration_timestamp")
     val expirationTimestamp: Long? = null,
 
+    @ColumnInfo(name = "initial_usage_offset_bytes", defaultValue = "0")
+    val initialUsageOffsetBytes: Long = 0L,
+
     @ColumnInfo(name = "sim_slot")
     val simSlot: SimSlot = SimSlot.SIM_1,
 
@@ -42,6 +46,7 @@ data class PromoEntity(
             totalAllowanceBytes = totalAllowanceBytes,
             startTimestamp = startTimestamp,
             expirationTimestamp = expirationTimestamp,
+            initialUsageOffsetBytes = initialUsageOffsetBytes,
             simSlot = simSlot,
             isActive = isActive
         )
@@ -58,6 +63,7 @@ fun Promo.toEntity(): PromoEntity {
         totalAllowanceBytes = totalAllowanceBytes,
         startTimestamp = startTimestamp,
         expirationTimestamp = expirationTimestamp,
+        initialUsageOffsetBytes = initialUsageOffsetBytes,
         simSlot = simSlot,
         isActive = isActive
     )

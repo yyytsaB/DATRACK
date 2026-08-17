@@ -191,12 +191,13 @@ fun PromoManagementScreen(
         if (showAddDialog) {
             PromoEntryDialog(
                 onDismissRequest = { showAddDialog = false },
-                onSavePromo = { name, allowanceBytes, startTimestamp, expirationTimestamp, simSlot, isActive ->
+                onSavePromo = { name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive ->
                     viewModel.savePromo(
                         name = name,
                         allowanceBytes = allowanceBytes,
                         startTimestamp = startTimestamp,
                         expirationTimestamp = expirationTimestamp,
+                        initialUsageOffsetBytes = initialUsageOffsetBytes,
                         simSlot = simSlot,
                         isActive = isActive,
                         onSuccess = { showAddDialog = false }

@@ -12,7 +12,7 @@ import java.util.Locale
  *
  * Implements the core Philippine Prepaid Mobile Data Burn-Rate calculation formulas,
  * safety guards against division by zero, stabilization dampening during initial hours,
- * and plain-language formatting.
+ * support for initial historical usage offsets, and plain-language formatting.
  *
  * This engine has zero Android framework dependencies per Engineering Rule #1.
  */
@@ -39,6 +39,13 @@ class BurnRateEngine {
     /**
      * Calculates the burn-rate forecast metrics.
      *
+     * Total data used is the sum of the historical starting baseline offset ([promo.initialUsageOffsetBytes])
+     * and live device-measured mobile bytes consumed during tracking ([promo.startTimestamp, currentTime]).
+     *
+     * The active burn rate ($R_{burn}$) is computed strictly from live device-measured usage divided by
+     * elapsed tracking time ($T_{elapsed}$), ensuring active velocity is not artificially inflated by
+     * historical pre-app usage.
+     *
      * @param promo The tracked promo domain model.
      * @param dataUsedBytesRaw The measured aggregate mobile bytes consumed during [promo.startTimestamp, currentTime].
      * @param currentTime Current epoch timestamp in milliseconds.
@@ -50,7 +57,11 @@ class BurnRateEngine {
         currentTime: Long
     ): BurnForecast {
         val elapsedTimeMs = maxOf(0L, currentTime - promo.startTimestamp)
-        val dataUsedBytes = maxOf(0L, dataUsedBytesRaw)
+        val measuredLiveUsageBytes = maxOf(0L, dataUsedBytesRaw)
+        val dataUsedBytes = minOf(
+            promo.totalAllowanceBytes,
+            maxOf(0L, promo.initialUsageOffsetBytes + measuredLiveUsageBytes)
+        )
         val dataRemainingBytes = maxOf(0L, promo.totalAllowanceBytes - dataUsedBytes)
         val isDepleted = (dataRemainingBytes == 0L)
 
@@ -58,9 +69,9 @@ class BurnRateEngine {
             maxOf(0L, exp - currentTime)
         }
 
-        // Division-by-zero safe burn rate calculation:
+        // Active device burn rate strictly from live tracked consumption:
         val burnRateBytesPerHour: Double = if (elapsedTimeMs > 0L) {
-            (dataUsedBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
+            (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
         } else {
             0.0
         }
@@ -77,7 +88,7 @@ class BurnRateEngine {
             burnStatusIndex = if (promo.expirationTimestamp != null) Double.POSITIVE_INFINITY else null
             plainLanguageSummary = "Depleted! ${promo.name} promo has 0 MB remaining."
         } else if (burnRateBytesPerHour <= 0.0 || elapsedTimeMs < STABILIZATION_WINDOW_MS) {
-            // Case 2: Zero burn rate or within initial 1-hour calibration window
+            // Case 2: Zero active burn rate or within initial 1-hour calibration window
             pace = BurnPace.INSUFFICIENT_DATA
             burnStatusIndex = null
 

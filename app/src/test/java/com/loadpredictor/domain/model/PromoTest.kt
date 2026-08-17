@@ -20,12 +20,14 @@ class PromoTest {
             totalAllowanceBytes = allowanceBytes,
             startTimestamp = start,
             expirationTimestamp = end,
+            initialUsageOffsetBytes = 1024L * 1024L * 500L, // 500 MB offset
             simSlot = SimSlot.SIM_1,
             isActive = true
         )
 
         assertEquals("Smart GigaSurf 99", promo.name)
         assertEquals(allowanceBytes, promo.totalAllowanceBytes)
+        assertEquals(1024L * 1024L * 500L, promo.initialUsageOffsetBytes)
         assertEquals(1_000_000L, promo.totalDurationMillis)
         assertFalse(promo.isNoExpiry)
         assertFalse(promo.isExpired(1_500_000L))
@@ -44,17 +46,54 @@ class PromoTest {
             totalAllowanceBytes = allowanceBytes,
             startTimestamp = start,
             expirationTimestamp = null,
+            initialUsageOffsetBytes = 0L,
             simSlot = SimSlot.SIM_1,
             isActive = true
         )
 
         assertEquals("Smart Magic Data 399", promo.name)
         assertEquals(allowanceBytes, promo.totalAllowanceBytes)
+        assertEquals(0L, promo.initialUsageOffsetBytes)
         assertNull(promo.totalDurationMillis)
         assertTrue(promo.isNoExpiry)
         assertNull(promo.expirationTimestamp)
         assertFalse(promo.isExpired(start + 1_000_000_000L))
         assertFalse(promo.isExpired(Long.MAX_VALUE))
+    }
+
+    @Test
+    fun `promo with initialUsageOffsetBytes equal to total allowance initializes validly`() {
+        val allowance = 10L * 1024L * 1024L
+        val promo = Promo(
+            name = "Fully Used Start",
+            totalAllowanceBytes = allowance,
+            startTimestamp = 1000L,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = allowance
+        )
+        assertEquals(allowance, promo.initialUsageOffsetBytes)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `promo with negative initialUsageOffsetBytes throws IllegalArgumentException`() {
+        Promo(
+            name = "Negative Offset",
+            totalAllowanceBytes = 5_000_000L,
+            startTimestamp = 1_000L,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = -1L
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `promo with initialUsageOffsetBytes exceeding total allowance throws IllegalArgumentException`() {
+        Promo(
+            name = "Excessive Offset",
+            totalAllowanceBytes = 5_000_000L,
+            startTimestamp = 1_000L,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = 5_000_001L
+        )
     }
 
     @Test(expected = IllegalArgumentException::class)
