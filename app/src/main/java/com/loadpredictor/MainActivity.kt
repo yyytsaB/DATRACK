@@ -52,11 +52,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import com.loadpredictor.data.stats.UsageAccessHelper
 import com.loadpredictor.domain.model.BurnForecast
 import com.loadpredictor.domain.model.BurnForecastResult
@@ -101,17 +105,15 @@ class MainActivity : ComponentActivity() {
 
                 var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
 
-                // Re-check permission automatically when user returns from Settings
+                // Lifecycle-aware foreground ticker: refreshes immediately on entry (and on resume from Settings)
+                // and every 30 seconds while in the foreground, automatically cancelling when backgrounded.
                 val lifecycleOwner = LocalLifecycleOwner.current
-                DisposableEffect(lifecycleOwner) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) {
-                            mainViewModel.checkPermission()
+                LaunchedEffect(lifecycleOwner) {
+                    lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        while (isActive) {
+                            mainViewModel.refresh()
+                            delay(30_000L)
                         }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose {
-                        lifecycleOwner.lifecycle.removeObserver(observer)
                     }
                 }
 
@@ -299,6 +301,10 @@ fun LiveForecastHeroCard(
 
             // Remaining Data Callout
             Column {
+                val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
+                    remainingBytes = forecast.dataRemainingBytes,
+                    totalAllowanceBytes = forecast.promo.totalAllowanceBytes
+                )
                 Text(
                     text = "REMAINING DATA",
                     style = MaterialTheme.typography.labelMedium,
@@ -306,13 +312,13 @@ fun LiveForecastHeroCard(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = formatBytes(forecast.dataRemainingBytes),
+                    text = dataPair.remainingFormatted,
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "of ${formatBytes(forecast.promo.totalAllowanceBytes)} total allowance",
+                    text = "of ${dataPair.totalFormatted} total allowance",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -501,12 +507,3 @@ fun ErrorForecastCard(message: String, onManageClick: () -> Unit) {
     }
 }
 
-private fun formatBytes(bytes: Long): String {
-    val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    return if (gb >= 1.0) {
-        String.format(Locale.US, "%.1f GB", gb)
-    } else {
-        val mb = bytes.toDouble() / (1024.0 * 1024.0)
-        String.format(Locale.US, "%.0f MB", mb)
-    }
-}

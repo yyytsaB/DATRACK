@@ -2,6 +2,7 @@ package com.loadpredictor.domain.usecase
 
 import com.loadpredictor.domain.engine.BurnRateEngine
 import com.loadpredictor.domain.model.BurnForecastResult
+import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.UsageAccessDeniedException
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.repository.UsageRepository
@@ -13,7 +14,7 @@ import kotlinx.coroutines.flow.transform
 
 /**
  * UseCase coordinating active promo lookup, mobile usage data queries,
- * and forecast calculation into a reactive [BurnForecastResult] stream.
+ * and forecast calculation into a reactive [BurnForecastResult] stream or on-demand execution.
  */
 class GetActiveBurnForecastUseCase(
     private val promoRepository: PromoRepository,
@@ -21,23 +22,34 @@ class GetActiveBurnForecastUseCase(
     private val burnRateEngine: BurnRateEngine = BurnRateEngine(),
     private val timeProvider: TimeProvider = DefaultTimeProvider()
 ) {
+    suspend fun execute(activePromo: Promo?): BurnForecastResult {
+        if (activePromo == null) {
+            return BurnForecastResult.NoActivePromo
+        }
+        return try {
+            val now = timeProvider.currentTimeMillis()
+            val usedBytes = usageRepository.queryMobileUsageBytes(
+                startTime = activePromo.startTimestamp,
+                endTime = now
+            )
+            val forecast = burnRateEngine.calculateForecast(
+                promo = activePromo,
+                dataUsedBytesRaw = usedBytes,
+                currentTime = now
+            )
+            BurnForecastResult.Success(forecast)
+        } catch (throwable: Throwable) {
+            if (throwable is UsageAccessDeniedException || throwable.cause is UsageAccessDeniedException) {
+                BurnForecastResult.PermissionRequired
+            } else {
+                BurnForecastResult.Error(throwable.localizedMessage ?: "Unexpected error during forecast calculation")
+            }
+        }
+    }
+
     operator fun invoke(): Flow<BurnForecastResult> = promoRepository.getActivePromo()
         .transform { activePromo ->
-            if (activePromo == null) {
-                emit(BurnForecastResult.NoActivePromo)
-            } else {
-                val now = timeProvider.currentTimeMillis()
-                val usedBytes = usageRepository.queryMobileUsageBytes(
-                    startTime = activePromo.startTimestamp,
-                    endTime = now
-                )
-                val forecast = burnRateEngine.calculateForecast(
-                    promo = activePromo,
-                    dataUsedBytesRaw = usedBytes,
-                    currentTime = now
-                )
-                emit(BurnForecastResult.Success(forecast))
-            }
+            emit(execute(activePromo))
         }
         .catch { throwable ->
             if (throwable is UsageAccessDeniedException || throwable.cause is UsageAccessDeniedException) {

@@ -205,9 +205,14 @@ private fun SuccessCompactLayout(state: WidgetState.Success) {
 
         Spacer(modifier = GlanceModifier.height(8.dp))
 
+        val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
+            remainingBytes = state.remainingBytes,
+            totalAllowanceBytes = state.totalAllowanceBytes
+        )
+
         // Hero Remaining Number (Dominant Hierarchy)
         Text(
-            text = formatBytes(state.remainingBytes),
+            text = dataPair.remainingFormatted,
             style = TextStyle(
                 color = GlanceTheme.colors.primary,
                 fontWeight = FontWeight.Bold,
@@ -217,7 +222,7 @@ private fun SuccessCompactLayout(state: WidgetState.Success) {
         )
 
         Text(
-            text = "left of ${formatBytes(state.totalAllowanceBytes)}",
+            text = "left of ${dataPair.totalFormatted}",
             style = TextStyle(
                 color = GlanceTheme.colors.onSurfaceVariant,
                 fontSize = 11.sp
@@ -281,13 +286,18 @@ private fun SuccessWideLayout(state: WidgetState.Success) {
 
         Spacer(modifier = GlanceModifier.height(10.dp))
 
+        val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
+            remainingBytes = state.remainingBytes,
+            totalAllowanceBytes = state.totalAllowanceBytes
+        )
+
         // Hero Row
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.Vertical.Bottom
         ) {
             Text(
-                text = formatBytes(state.remainingBytes),
+                text = dataPair.remainingFormatted,
                 style = TextStyle(
                     color = GlanceTheme.colors.primary,
                     fontWeight = FontWeight.Bold,
@@ -297,7 +307,7 @@ private fun SuccessWideLayout(state: WidgetState.Success) {
             )
             Spacer(modifier = GlanceModifier.width(8.dp))
             Text(
-                text = "left of ${formatBytes(state.totalAllowanceBytes)}",
+                text = "left of ${dataPair.totalFormatted}",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
                     fontSize = 13.sp
@@ -309,10 +319,8 @@ private fun SuccessWideLayout(state: WidgetState.Success) {
         Spacer(modifier = GlanceModifier.height(8.dp))
 
         // Depletion Projection Sentence (Clean single line)
-        val projectionText = if (state.pace == BurnPace.INSUFFICIENT_DATA) {
-            "Calibrating pace • ${formatBytes(state.remainingBytes)} remaining"
-        } else {
-            state.plainLanguageSummary
+        val projectionText = state.plainLanguageSummary.ifBlank {
+            "Calibrating pace • ${dataPair.remainingFormatted} remaining"
         }
 
         Text(
@@ -521,12 +529,3 @@ private fun PaceBadge(pace: BurnPace) {
     SurfaceBadge(text = label, bgColor = bg, textColor = fg)
 }
 
-private fun formatBytes(bytes: Long): String {
-    val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    return if (gb >= 1.0) {
-        String.format(Locale.US, "%.1f GB", gb)
-    } else {
-        val mb = bytes.toDouble() / (1024.0 * 1024.0)
-        String.format(Locale.US, "%.0f MB", mb)
-    }
-}

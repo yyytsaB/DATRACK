@@ -18,9 +18,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Main ViewModel coordinating top-level app state: usage permission status,
@@ -54,6 +56,64 @@ class MainViewModel(
                 isUsagePermissionGranted = hasPermission,
                 isLoading = false
             )
+        }
+    }
+
+    /**
+     * Atomically refreshes both the live forecast and daily usage breakdown.
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            checkPermission()
+            val promo = _uiState.value.activePromo ?: try {
+                getActivePromoUseCase().first()
+            } catch (e: Exception) {
+                null
+            }
+
+            if (promo == null) {
+                _uiState.update { current ->
+                    current.copy(
+                        forecastResult = BurnForecastResult.NoActivePromo,
+                        dailyUsageBreakdown = emptyList(),
+                        isLoading = false
+                    )
+                }
+                return@launch
+            }
+
+            val forecastResult = getActiveBurnForecastUseCase.execute(promo)
+            val dailyBreakdown = if (getDailyUsageBreakdownUseCase != null) {
+                try {
+                    getDailyUsageBreakdownUseCase(promo)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
+            _uiState.update { current ->
+                when (forecastResult) {
+                    is BurnForecastResult.PermissionRequired -> current.copy(
+                        isUsagePermissionGranted = false,
+                        forecastResult = forecastResult,
+                        dailyUsageBreakdown = dailyBreakdown,
+                        isLoading = false
+                    )
+                    is BurnForecastResult.Success -> current.copy(
+                        activePromo = forecastResult.forecast.promo,
+                        forecastResult = forecastResult,
+                        dailyUsageBreakdown = dailyBreakdown,
+                        isLoading = false
+                    )
+                    else -> current.copy(
+                        forecastResult = forecastResult,
+                        dailyUsageBreakdown = dailyBreakdown,
+                        isLoading = false
+                    )
+                }
+            }
         }
     }
 

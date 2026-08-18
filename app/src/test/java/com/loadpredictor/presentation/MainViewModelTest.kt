@@ -104,4 +104,61 @@ class MainViewModelTest {
 
         assertTrue(viewModel.uiState.value.isUsagePermissionGranted)
     }
+
+    @Test
+    fun `refresh re-queries forecast and daily usage breakdown and updates state`() = runTest {
+        hasPermission = true
+        var queryCount = 0
+        val trackingUsageRepo = object : UsageRepository {
+            override fun hasUsageAccess(): Boolean = true
+            override suspend fun queryMobileUsageBytes(startTime: Long, endTime: Long): Long {
+                queryCount++
+                return 500_000L * queryCount
+            }
+            override suspend fun queryDailyUsageBreakdown(startTime: Long, endTime: Long) = listOf(
+                com.loadpredictor.domain.model.UsageBucket(
+                    startTimestamp = 1000L,
+                    endTimestamp = 2000L,
+                    rxBytes = 100L,
+                    txBytes = 200L
+                )
+            )
+        }
+
+        val promo = Promo(
+            id = 1L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = 1000L,
+            expirationTimestamp = null,
+            simSlot = SimSlot.SIM_1,
+            isActive = true
+        )
+        activePromoFlow.value = promo
+
+        val checkUsagePermissionUseCase = CheckUsagePermissionUseCase(trackingUsageRepo)
+        val getActivePromoUseCase = GetActivePromoUseCase(fakePromoRepository)
+        val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(fakePromoRepository, trackingUsageRepo)
+        val getDailyUsageBreakdownUseCase = com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(trackingUsageRepo)
+
+        val viewModel = MainViewModel(
+            checkUsagePermissionUseCase = checkUsagePermissionUseCase,
+            getActivePromoUseCase = getActivePromoUseCase,
+            getActiveBurnForecastUseCase = getActiveBurnForecastUseCase,
+            getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
+        )
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.forecastResult is BurnForecastResult.Success)
+        assertEquals(1, viewModel.uiState.value.dailyUsageBreakdown.size)
+
+        // Trigger manual/ticker refresh
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.forecastResult is BurnForecastResult.Success)
+        assertEquals(1, viewModel.uiState.value.dailyUsageBreakdown.size)
+        assertTrue(queryCount >= 2)
+    }
 }

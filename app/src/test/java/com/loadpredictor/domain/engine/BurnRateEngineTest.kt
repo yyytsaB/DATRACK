@@ -304,4 +304,41 @@ class BurnRateEngineTest {
         assertEquals("2.0 GB", engine.formatBytes(2L * 1024L * 1024L * 1024L))
         assertEquals("500 MB", engine.formatBytes(500L * 1024L * 1024L))
     }
+
+    @Test
+    fun `plainLanguageSummary preserves 2-decimal precision during calibration for small nonzero usage`() {
+        val start = 1_000_000L
+        val totalAllowance = 24L * 1024L * 1024L * 1024L // 24 GB
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = totalAllowance,
+            startTimestamp = start,
+            expirationTimestamp = null
+        )
+
+        // 20 MB used within calibration window
+        val used = 20L * 1024L * 1024L
+        val forecast = engine.calculateForecast(promo, used, start + 30 * 60 * 1000L)
+
+        assertEquals("Calibrating pace • 23.98 GB remaining.", forecast.plainLanguageSummary)
+    }
+
+    @Test
+    fun `plainLanguageSummary uses standard 1-decimal precision for normal usage`() {
+        val start = 1_000_000L
+        val totalAllowance = 24L * 1024L * 1024L * 1024L // 24 GB
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = totalAllowance,
+            startTimestamp = start,
+            expirationTimestamp = null
+        )
+
+        // 6 GB used (18 GB remaining)
+        val used = 6L * 1024L * 1024L * 1024L
+        val forecast = engine.calculateForecast(promo, used, start + 30 * 60 * 1000L)
+
+        assertEquals("Calibrating pace • 18.0 GB remaining.", forecast.plainLanguageSummary)
+    }
 }
+

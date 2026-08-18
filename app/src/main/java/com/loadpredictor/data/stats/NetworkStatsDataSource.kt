@@ -13,8 +13,8 @@ import com.loadpredictor.domain.model.UsageBucket
  *
  * Crucial Constraints (from SKILL.md Section 2.2):
  * 1. Filter strictly to [ConnectivityManager.TYPE_MOBILE] to exclude WiFi traffic.
- * 2. Pass an empty string "" for [subscriberId]. Do NOT attempt real subscriberId/IMSI
- *    retrieval (restricted on Android 10+ for non-carrier-privileged apps).
+ * 2. Pass null for [subscriberId]. Passing an empty string "" fails silently on hardware (matches 0 records).
+ *    Passing null aggregates device-wide mobile data across the device's cellular interfaces.
  * 3. Distinguish permission failure ([UsageAccessDeniedException]) from genuine 0L usage.
  */
 class NetworkStatsDataSource(
@@ -43,12 +43,12 @@ class NetworkStatsDataSource(
             ?: throw UsageAccessDeniedException("NetworkStatsManager system service is unavailable")
 
         return try {
-            // Per SKILL.md 2.2: Pass empty string "" for subscriberId to aggregate device-wide mobile data.
+            // Per SKILL.md 2.2: Pass null for subscriberId to aggregate device-wide mobile data.
             @Suppress("DEPRECATION")
             val networkType = ConnectivityManager.TYPE_MOBILE
             val bucket = manager.querySummaryForDevice(
                 networkType,
-                "",
+                null,
                 startTime,
                 endTime
             )
@@ -88,7 +88,7 @@ class NetworkStatsDataSource(
             try {
                 val bucket = manager.querySummaryForDevice(
                     mobileType,
-                    "",
+                    null,
                     currentStart,
                     currentEnd
                 )

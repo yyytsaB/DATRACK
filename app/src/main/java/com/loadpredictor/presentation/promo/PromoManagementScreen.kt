@@ -258,7 +258,7 @@ fun ActivePromoCard(promo: Promo) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
                     Text(
-                        text = formatAllowance(promo.totalAllowanceBytes),
+                        text = com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -332,7 +332,7 @@ fun PromoItemCard(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${formatAllowance(promo.totalAllowanceBytes)} • ${if (promo.isNoExpiry) "No Expiry" else "Expiring"}",
+                    text = "${com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes)} • ${if (promo.isNoExpiry) "No Expiry" else "Expiring"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -349,12 +349,3 @@ fun PromoItemCard(
     }
 }
 
-private fun formatAllowance(bytes: Long): String {
-    val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    return if (gb >= 1.0) {
-        String.format(Locale.US, "%.1f GB", gb)
-    } else {
-        val mb = bytes.toDouble() / (1024.0 * 1024.0)
-        String.format(Locale.US, "%.0f MB", mb)
-    }
-}

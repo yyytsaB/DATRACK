@@ -73,7 +73,7 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val formattedRemaining = formatBytes(remainingBytes)
+        val formattedRemaining = com.loadpredictor.util.DataFormatter.formatBytes(remainingBytes)
         val title = "⚠️ Data Alert: $thresholdPercent% Used"
         val message = "You have consumed $thresholdPercent% of your $promoName allowance. $formattedRemaining remaining."
 
@@ -110,7 +110,7 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val formattedRemaining = formatBytes(remainingBytes)
+        val formattedRemaining = com.loadpredictor.util.DataFormatter.formatBytes(remainingBytes)
         val earlyText = if (hoursEarly >= 24) "${hoursEarly / 24} days" else "$hoursEarly hours"
         val title = "🔥 Burning Fast: $promoName"
         val message = "At your current pace, your data will run out $earlyText before promo expiration. ($formattedRemaining remaining)"
@@ -131,14 +131,5 @@ class NotificationHelper(private val context: Context) {
             // Permission revoked
         }
     }
-
-    private fun formatBytes(bytes: Long): String {
-        val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-        return if (gb >= 1.0) {
-            String.format(Locale.US, "%.1f GB", gb)
-        } else {
-            val mb = bytes.toDouble() / (1024.0 * 1024.0)
-            String.format(Locale.US, "%.0f MB", mb)
-        }
-    }
 }
+

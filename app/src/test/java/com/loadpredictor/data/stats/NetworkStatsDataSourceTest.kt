@@ -31,7 +31,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime,
                 endTime
             )
@@ -49,7 +49,7 @@ class NetworkStatsDataSourceTest {
         verify(exactly = 1) {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime,
                 endTime
             )
@@ -65,7 +65,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime,
                 endTime
             )
@@ -127,7 +127,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 any(),
                 any()
             )
@@ -165,7 +165,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime,
                 startTime + oneDayMillis
             )
@@ -175,7 +175,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime + oneDayMillis,
                 startTime + (2 * oneDayMillis)
             )
@@ -185,7 +185,7 @@ class NetworkStatsDataSourceTest {
         every {
             networkStatsManager.querySummaryForDevice(
                 ConnectivityManager.TYPE_MOBILE,
-                "",
+                null,
                 startTime + (2 * oneDayMillis),
                 endTime
             )
@@ -214,6 +214,27 @@ class NetworkStatsDataSourceTest {
         assertEquals(startTime + (2 * oneDayMillis), buckets[2].startTimestamp)
         assertEquals(endTime, buckets[2].endTimestamp)
         assertEquals(750_000L, buckets[2].totalBytes)
+
+        @Suppress("DEPRECATION")
+        verify(exactly = 1) {
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                null,
+                startTime,
+                startTime + oneDayMillis
+            )
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                null,
+                startTime + oneDayMillis,
+                startTime + (2 * oneDayMillis)
+            )
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                null,
+                startTime + (2 * oneDayMillis),
+                endTime
+            )
+        }
     }
 }
-

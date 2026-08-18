@@ -32,6 +32,9 @@ class ThresholdNotificationFlowTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+            "appops set ${context.packageName} android:get_usage_stats allow"
+        )
         database = AppDatabase.getInstance(context)
         notificationPrefs = NotificationPreferencesDataSource(context)
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -39,7 +42,7 @@ class ThresholdNotificationFlowTest {
 
     @Test
     fun testThresholdNotificationFiringAndAntiReFireSuppression() = runBlocking {
-        // Step 1: Insert promo with 80% consumed (10 GB total, 8 GB used via initial offset)
+        // Step 1: Insert promo with 80% consumed (10 GB total, 8 GB used via initial offset, non-expiring)
         val now = System.currentTimeMillis()
         val totalAllowance = 10L * 1024L * 1024L * 1024L // 10 GB
         val initialOffset = 8L * 1024L * 1024L * 1024L  // 8 GB (80% used)
@@ -49,7 +52,7 @@ class ThresholdNotificationFlowTest {
                 name = "Test Threshold GigaSurf",
                 totalAllowanceBytes = totalAllowance,
                 startTimestamp = now - 3600000L,
-                expirationTimestamp = now + (3 * 86400000L),
+                expirationTimestamp = null,
                 initialUsageOffsetBytes = initialOffset,
                 simSlot = SimSlot.SIM_1,
                 isActive = true

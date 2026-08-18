@@ -94,10 +94,10 @@ class BurnRateEngine {
 
             if (promo.expirationTimestamp != null) {
                 estimatedDepletionTimestamp = promo.expirationTimestamp
-                plainLanguageSummary = "Calibrating: ${formatBytes(dataRemainingBytes)} remaining, on track to expiration."
+                plainLanguageSummary = "Calibrating: ${formatBytes(dataRemainingBytes, promo.totalAllowanceBytes)} remaining, on track to expiration."
             } else {
                 estimatedDepletionTimestamp = null
-                plainLanguageSummary = "Calibrating pace • ${formatBytes(dataRemainingBytes)} remaining."
+                plainLanguageSummary = "Calibrating pace • ${formatBytes(dataRemainingBytes, promo.totalAllowanceBytes)} remaining."
             }
         } else {
             // Case 3: Stabilized positive burn rate
@@ -130,11 +130,11 @@ class BurnRateEngine {
                     index < CONSERVATIVE_THRESHOLD -> {
                         pace = BurnPace.CONSERVATIVE
                         val daysLeft = maxOf(0L, (promo.expirationTimestamp - currentTime) / (24 * 3_600_000L))
-                        plainLanguageSummary = "Pace is optimal: ${formatBytes(dataRemainingBytes)} remaining on ${promo.name} with $daysLeft days left."
+                        plainLanguageSummary = "Pace is optimal: ${formatBytes(dataRemainingBytes, promo.totalAllowanceBytes)} remaining on ${promo.name} with $daysLeft days left."
                     }
                     else -> {
                         pace = BurnPace.ON_TRACK
-                        plainLanguageSummary = "On track: ${formatBytes(dataRemainingBytes)} remaining on ${promo.name}, projected to last through promo validity."
+                        plainLanguageSummary = "On track: ${formatBytes(dataRemainingBytes, promo.totalAllowanceBytes)} remaining on ${promo.name}, projected to last through promo validity."
                     }
                 }
             } else {
@@ -162,14 +162,8 @@ class BurnRateEngine {
     /**
      * Formats bytes to MB or GB with clean precision.
      */
-    fun formatBytes(bytes: Long): String {
-        val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-        return if (gb >= 1.0) {
-            String.format(Locale.US, "%.1f GB", gb)
-        } else {
-            val mb = bytes.toDouble() / (1024.0 * 1024.0)
-            String.format(Locale.US, "%.0f MB", mb)
-        }
+    fun formatBytes(bytes: Long, totalAllowanceBytes: Long? = null): String {
+        return com.loadpredictor.util.DataFormatter.formatDataAmount(bytes, totalAllowanceBytes)
     }
 
     /**
