@@ -65,6 +65,47 @@ class BurnRateEngineTest {
     }
 
     @Test
+    fun `elapsed time past stabilization window but usage below 10 MB returns insufficient data`() {
+        val start = 1_000_000L
+        val current = start + 3 * 3_600_000L // 3 hours elapsed (> 1 hour)
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L, // 24 GB
+            startTimestamp = start,
+            expirationTimestamp = null
+        )
+
+        // Only 15 KB consumed (background noise / pings, well below 10 MB threshold)
+        val used = 15_000L
+        val forecast = engine.calculateForecast(promo, used, current)
+
+        assertEquals(BurnPace.INSUFFICIENT_DATA, forecast.pace)
+        assertNull(forecast.estimatedDepletionTimestamp)
+        assertNull(forecast.burnStatusIndex)
+        assertTrue(forecast.plainLanguageSummary.contains("Calibrating pace"))
+    }
+
+    @Test
+    fun `usage above 10 MB but elapsed time within stabilization window returns insufficient data`() {
+        val start = 1_000_000L
+        val current = start + 20 * 60 * 1_000L // 20 minutes elapsed (< 1 hour)
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L, // 24 GB
+            startTimestamp = start,
+            expirationTimestamp = null
+        )
+
+        // Used 50 MB (> 10 MB) but only 20 minutes elapsed
+        val used = 50L * 1024L * 1024L
+        val forecast = engine.calculateForecast(promo, used, current)
+
+        assertEquals(BurnPace.INSUFFICIENT_DATA, forecast.pace)
+        assertNull(forecast.estimatedDepletionTimestamp)
+        assertTrue(forecast.plainLanguageSummary.contains("Calibrating pace"))
+    }
+
+    @Test
     fun `non-expiring promo in initial hour returns null depletion date`() {
         val start = 1_000_000L
         val current = start + 20 * 60 * 1_000L // 20 minutes elapsed
@@ -139,7 +180,7 @@ class BurnRateEngineTest {
         )
 
         // Elapsed: 20 hours (20% of time)
-        // Consumed: 5 GB (50% of data)
+        // Consumed: 5 GB (50% of data, > 10 MB)
         // Index: 0.50 / 0.20 = 2.5 > 1.25 -> BURNING_FAST
         val current = start + 20 * 3_600_000L
         val used = 5L * 1024L * 1024L * 1024L
@@ -168,7 +209,7 @@ class BurnRateEngineTest {
         )
 
         // Elapsed: 50 hours (50% of time)
-        // Consumed: 1 GB (10% of data)
+        // Consumed: 1 GB (10% of data, > 10 MB)
         // Index: 0.10 / 0.50 = 0.2 < 0.75 -> CONSERVATIVE
         val current = start + 50 * 3_600_000L
         val used = 1L * 1024L * 1024L * 1024L
@@ -195,7 +236,7 @@ class BurnRateEngineTest {
         )
 
         // Elapsed: 50 hours (50% of time)
-        // Consumed: 5 GB (50% of data)
+        // Consumed: 5 GB (50% of data, > 10 MB)
         // Index: 0.50 / 0.50 = 1.0 -> ON_TRACK
         val current = start + 50 * 3_600_000L
         val used = 5L * 1024L * 1024L * 1024L
@@ -218,7 +259,7 @@ class BurnRateEngineTest {
         )
 
         // Elapsed: 10 hours
-        // Consumed: 2 GB (Burn rate = 0.2 GB / hr)
+        // Consumed: 2 GB (> 10 MB, Burn rate = 0.2 GB / hr)
         // Remaining: 18 GB -> Projected to last: 18 / 0.2 = 90 hours from now
         val current = start + 10 * 3_600_000L
         val used = 2L * 1024L * 1024L * 1024L
@@ -251,7 +292,7 @@ class BurnRateEngineTest {
         )
 
         // Elapsed: 10 hours of app tracking
-        // Live device measured usage during these 10 hours: 2 GB (Burn rate = 0.2 GB / hr)
+        // Live device measured usage during these 10 hours: 2 GB (> 10 MB, Burn rate = 0.2 GB / hr)
         // Total data used: 4 GB (historical) + 2 GB (live) = 6 GB
         // Remaining data: 24 GB - 6 GB = 18 GB
         // Projected depletion: 18 GB / 0.2 GB/hr = 90 hours
@@ -316,7 +357,7 @@ class BurnRateEngineTest {
             expirationTimestamp = null
         )
 
-        // 20 MB used within calibration window
+        // 20 MB used within calibration window (< 1 hour)
         val used = 20L * 1024L * 1024L
         val forecast = engine.calculateForecast(promo, used, start + 30 * 60 * 1000L)
 
@@ -341,4 +382,3 @@ class BurnRateEngineTest {
         assertEquals("Calibrating pace • 18.0 GB remaining.", forecast.plainLanguageSummary)
     }
 }
-

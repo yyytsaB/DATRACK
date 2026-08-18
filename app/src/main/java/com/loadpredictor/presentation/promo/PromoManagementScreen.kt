@@ -1,5 +1,6 @@
 package com.loadpredictor.presentation.promo
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,12 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
@@ -31,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,15 +43,38 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.SimSlot
-import java.util.Locale
+import com.loadpredictor.presentation.theme.AlertCardBorder
+import com.loadpredictor.presentation.theme.BorderHighlight
+import com.loadpredictor.presentation.theme.DarkBackground
+import com.loadpredictor.presentation.theme.DarkOutline
+import com.loadpredictor.presentation.theme.DarkOutlineVariant
+import com.loadpredictor.presentation.theme.MintGlow
+import com.loadpredictor.presentation.theme.MintOnPrimary
+import com.loadpredictor.presentation.theme.MintPrimary
+import com.loadpredictor.presentation.theme.PaceCritical
+import com.loadpredictor.presentation.theme.PurpleGradientBrush
+import com.loadpredictor.presentation.theme.SurfaceLayer1
+import com.loadpredictor.presentation.theme.SurfaceLayer2
+import com.loadpredictor.presentation.theme.SurfaceRecessed
+import com.loadpredictor.presentation.theme.TextHighEmphasis
+import com.loadpredictor.presentation.theme.TextMediumEmphasis
 
 /**
  * Screen for viewing, switching, adding, and deleting tracked promos.
+ *
+ * Matches Panel 3 of the reference design:
+ * - Recessed top guidance callout
+ * - Midnight purple gradient Active Tracking Context card with dual metrics
+ * - Layered dark promo cards with mint radio selection
+ * - Glowing mint Floating Action Button
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,31 +86,51 @@ fun PromoManagementScreen(
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
+        containerColor = DarkBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Manage Promos", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "Manage Promos",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = TextHighEmphasis
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = TextHighEmphasis
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = DarkBackground,
+                    titleContentColor = TextHighEmphasis
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp)
+                containerColor = MintPrimary,
+                contentColor = MintOnPrimary,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(16.dp),
+                    spotColor = MintGlow,
+                    ambientColor = MintGlow
+                )
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Promo")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Promo",
+                    tint = MintOnPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     ) { innerPadding ->
@@ -98,41 +141,54 @@ fun PromoManagementScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Informative sample disclaimer
+            // Informative sample disclaimer callout
             item {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceRecessed,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, DarkOutlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(
+                                    color = SurfaceLayer1,
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MintPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Presets are common sample configurations. Adjust allowance and duration to match your exact subscribed promo.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = TextMediumEmphasis,
+                            lineHeight = 18.sp
                         )
                     }
                 }
             }
 
-            // Active promo banner if exists
+            // Active promo context card
             if (uiState.activePromo != null) {
                 item {
                     Text(
-                        text = "Active Tracking Context",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "ACTIVE TRACKING CONTEXT",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        letterSpacing = 1.2.sp,
+                        color = MintPrimary
                     )
                 }
                 item {
@@ -145,7 +201,7 @@ fun PromoManagementScreen(
                     text = "Saved Promos (${uiState.promos.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = TextHighEmphasis
                 )
             }
 
@@ -153,8 +209,9 @@ fun PromoManagementScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(16.dp)
+                        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, BorderHighlight)
                     ) {
                         Column(
                             modifier = Modifier
@@ -165,13 +222,14 @@ fun PromoManagementScreen(
                             Text(
                                 text = "No promos configured yet.",
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextHighEmphasis
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Tap the + button below to add your active mobile data promo.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMediumEmphasis
                             )
                         }
                     }
@@ -213,70 +271,78 @@ fun ActivePromoCard(promo: Promo) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, AlertCardBorder)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(PurpleGradientBrush)
                 .padding(20.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = promo.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "Total Allowance",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes),
-                        style = MaterialTheme.typography.titleMedium,
+                        text = promo.name,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = TextHighEmphasis
                     )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MintPrimary
+                    ) {
+                        Text(
+                            text = if (promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
+                            color = MintOnPrimary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontWeight = FontWeight.Black
+                        )
+                    }
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Validity",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = if (promo.isNoExpiry) "No Expiration" else "Expiring",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Total Allowance",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMediumEmphasis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextHighEmphasis
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Validity",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMediumEmphasis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (promo.isNoExpiry) "No Expiration" else "Expiring",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextHighEmphasis
+                        )
+                    }
                 }
             }
         }
@@ -294,9 +360,12 @@ fun PromoItemCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+            containerColor = if (isActive) SurfaceLayer2 else SurfaceLayer1
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        border = BorderStroke(
+            1.dp,
+            if (isActive) MintPrimary.copy(alpha = 0.6f) else BorderHighlight
+        )
     ) {
         Row(
             modifier = Modifier
@@ -306,7 +375,11 @@ fun PromoItemCard(
         ) {
             RadioButton(
                 selected = isActive,
-                onClick = onSelectActive
+                onClick = onSelectActive,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = MintPrimary,
+                    unselectedColor = Color(0xFF6B7280)
+                )
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -316,16 +389,19 @@ fun PromoItemCard(
                     Text(
                         text = promo.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextHighEmphasis
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        color = SurfaceRecessed,
+                        border = BorderStroke(1.dp, DarkOutlineVariant)
                     ) {
                         Text(
                             text = if (promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
                             style = MaterialTheme.typography.labelSmall,
+                            color = TextMediumEmphasis,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -334,7 +410,7 @@ fun PromoItemCard(
                 Text(
                     text = "${com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes)} • ${if (promo.isNoExpiry) "No Expiry" else "Expiring"}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextMediumEmphasis
                 )
             }
 
@@ -342,10 +418,9 @@ fun PromoItemCard(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Promo",
-                    tint = MaterialTheme.colorScheme.error
+                    tint = PaceCritical
                 )
             }
         }
     }
 }
-

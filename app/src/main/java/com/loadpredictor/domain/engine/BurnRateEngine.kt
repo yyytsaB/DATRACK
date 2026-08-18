@@ -12,6 +12,7 @@ import java.util.Locale
  *
  * Implements the core Philippine Prepaid Mobile Data Burn-Rate calculation formulas,
  * safety guards against division by zero, stabilization dampening during initial hours,
+ * minimum meaningful usage thresholds to prevent background sync noise from triggering premature projections,
  * support for initial historical usage offsets, and plain-language formatting.
  *
  * This engine has zero Android framework dependencies per Engineering Rule #1.
@@ -24,6 +25,13 @@ class BurnRateEngine {
          * Prevents initial burst usage from causing astronomical premature depletion projections.
          */
         const val STABILIZATION_WINDOW_MS = 3_600_000L
+
+        /**
+         * Minimum live mobile data consumption in bytes (10 MB) required to exit calibration.
+         * Guarantees immunity against background system sync pings, FCM heartbeats, and OS telemetry,
+         * ensuring projections are strictly computed from meaningful user data activity.
+         */
+        const val MIN_MEANINGFUL_USAGE_BYTES = 10L * 1024L * 1024L // 10 MB
 
         /**
          * Burn Status Index threshold for fast data consumption (>= 25% faster than linear pace).
@@ -45,6 +53,9 @@ class BurnRateEngine {
      * The active burn rate ($R_{burn}$) is computed strictly from live device-measured usage divided by
      * elapsed tracking time ($T_{elapsed}$), ensuring active velocity is not artificially inflated by
      * historical pre-app usage.
+     *
+     * Both [STABILIZATION_WINDOW_MS] AND [MIN_MEANINGFUL_USAGE_BYTES] must be satisfied (strict AND)
+     * before the engine exits [BurnPace.INSUFFICIENT_DATA] / Calibrating.
      *
      * @param promo The tracked promo domain model.
      * @param dataUsedBytesRaw The measured aggregate mobile bytes consumed during [promo.startTimestamp, currentTime].
@@ -76,6 +87,10 @@ class BurnRateEngine {
             0.0
         }
 
+        // Strict AND combination: must clear BOTH the time window AND the 10 MB volume threshold
+        val hasSufficientData = (elapsedTimeMs >= STABILIZATION_WINDOW_MS) &&
+                (measuredLiveUsageBytes >= MIN_MEANINGFUL_USAGE_BYTES)
+
         val estimatedDepletionTimestamp: Long?
         val burnStatusIndex: Double?
         val pace: BurnPace
@@ -87,8 +102,8 @@ class BurnRateEngine {
             estimatedDepletionTimestamp = currentTime
             burnStatusIndex = if (promo.expirationTimestamp != null) Double.POSITIVE_INFINITY else null
             plainLanguageSummary = "Depleted! ${promo.name} promo has 0 MB remaining."
-        } else if (burnRateBytesPerHour <= 0.0 || elapsedTimeMs < STABILIZATION_WINDOW_MS) {
-            // Case 2: Zero active burn rate or within initial 1-hour calibration window
+        } else if (!hasSufficientData || burnRateBytesPerHour <= 0.0) {
+            // Case 2: Insufficient time (< 1 hr), insufficient data volume (< 10 MB), or zero active burn rate
             pace = BurnPace.INSUFFICIENT_DATA
             burnStatusIndex = null
 
@@ -100,7 +115,7 @@ class BurnRateEngine {
                 plainLanguageSummary = "Calibrating pace • ${formatBytes(dataRemainingBytes, promo.totalAllowanceBytes)} remaining."
             }
         } else {
-            // Case 3: Stabilized positive burn rate
+            // Case 3: Stabilized positive burn rate with meaningful usage
             val remainingHours = dataRemainingBytes.toDouble() / burnRateBytesPerHour
             val remainingMs = (remainingHours * 3_600_000.0).toLong()
             val depletionTime = currentTime + remainingMs

@@ -2,6 +2,7 @@ package com.loadpredictor.presentation.dashboard
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,7 +40,18 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.loadpredictor.domain.model.UsageBucket
+import com.loadpredictor.presentation.theme.BorderHighlight
+import com.loadpredictor.presentation.theme.DarkOutline
+import com.loadpredictor.presentation.theme.MintPrimary
+import com.loadpredictor.presentation.theme.PurpleBadgeBackground
+import com.loadpredictor.presentation.theme.PurpleBadgeText
+import com.loadpredictor.presentation.theme.SurfaceLayer1
+import com.loadpredictor.presentation.theme.SurfaceRecessed
+import com.loadpredictor.presentation.theme.TextHighEmphasis
+import com.loadpredictor.presentation.theme.TextLowEmphasis
+import com.loadpredictor.presentation.theme.TextMediumEmphasis
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,8 +60,8 @@ import java.util.Locale
  * Native Jetpack Compose Canvas / Column chart displaying day-by-day mobile data consumption
  * within the active promo period.
  *
- * Implements smooth animated bars, peak indicator, interactive daily inspect, and average daily line.
- * Has zero third-party chart dependencies.
+ * Restyled with layered elevation: SurfaceLayer1 card, SurfaceRecessed chart stage,
+ * soft lavender/purple date badge, and vibrant mint active bar.
  */
 @Composable
 fun DailyUsageChartCard(
@@ -63,12 +75,13 @@ fun DailyUsageChartCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
+        border = BorderStroke(1.dp, BorderHighlight)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(22.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Title + Selected Day Header
@@ -82,12 +95,12 @@ fun DailyUsageChartCard(
                         text = "Daily Consumption",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextHighEmphasis
                     )
                     Text(
                         text = "Device-measured mobile usage",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = TextMediumEmphasis
                     )
                 }
 
@@ -95,27 +108,28 @@ fun DailyUsageChartCard(
                     val selected = buckets[selectedBucketIndex]
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                        color = PurpleBadgeBackground,
+                        border = BorderStroke(1.dp, Color(0xFF3B2D6B))
                     ) {
                         Text(
                             text = "${formatDayLabel(selected.startTimestamp)}: ${com.loadpredictor.util.DataFormatter.formatBytes(selected.totalBytes)}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            color = PurpleBadgeText,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
                 }
             }
 
-            if (buckets.isEmpty() || buckets.all { it.totalBytes == 0L }) {
+            if (buckets.isEmpty()) {
                 // Empty / initial tracking state
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
                         .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            SurfaceRecessed,
                             shape = RoundedCornerShape(16.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -124,31 +138,30 @@ fun DailyUsageChartCard(
                         text = "📊 Initializing daily history...\nUsage will be plotted as device traffic occurs.",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = TextMediumEmphasis,
+                        lineHeight = 20.sp
                     )
                 }
             } else {
                 val maxBytes = buckets.maxOf { it.totalBytes }.coerceAtLeast(1024L * 1024L) // at least 1 MB
                 val averageBytes = buckets.map { it.totalBytes }.average()
 
-                // Chart Area
+                // Recessed Chart Stage
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(160.dp)
                         .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            SurfaceRecessed,
                             shape = RoundedCornerShape(16.dp)
                         )
                         .padding(horizontal = 12.dp, vertical = 16.dp)
                 ) {
                     // Average Line Canvas
-                    val primaryColor = MaterialTheme.colorScheme.primary
-                    val outlineColor = MaterialTheme.colorScheme.outlineVariant
                     Canvas(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
                         val avgY = size.height * (1f - (averageBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f))
                         drawLine(
-                            color = outlineColor,
+                            color = DarkOutline,
                             start = Offset(0f, avgY),
                             end = Offset(size.width, avgY),
                             strokeWidth = 2f,
@@ -162,8 +175,8 @@ fun DailyUsageChartCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        val recentBuckets = buckets.takeLast(14) // Display last 14 days max for clean width
-                        recentBuckets.forEachIndexed { index, bucket ->
+                        val recentBuckets = buckets.takeLast(14) // Display last 14 days max
+                        recentBuckets.forEach { bucket ->
                             val isSelected = (selectedBucketIndex == buckets.indexOf(bucket))
                             val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
                             val animatedHeightFraction by animateFloatAsState(
@@ -192,8 +205,8 @@ fun DailyUsageChartCard(
                                             .fillMaxHeight(animatedHeightFraction)
                                             .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                             .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                                if (isSelected) MintPrimary
+                                                else Color(0xFF2D3442)
                                             )
                                     )
                                 }
@@ -204,7 +217,7 @@ fun DailyUsageChartCard(
                                     text = formatShortDay(bucket.startTimestamp),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.85,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isSelected) MintPrimary else TextMediumEmphasis,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center
                                 )
@@ -222,14 +235,14 @@ fun DailyUsageChartCard(
                 Icon(
                     imageVector = Icons.Default.Info,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    tint = TextLowEmphasis,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Daily bars reflect actual on-device data measured by Android since promo registration.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = TextLowEmphasis
                 )
             }
         }
@@ -245,4 +258,3 @@ private fun formatShortDay(timestamp: Long): String {
     val sdf = SimpleDateFormat("EEE", Locale.US)
     return sdf.format(Date(timestamp)).take(2)
 }
-

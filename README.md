@@ -96,7 +96,7 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 **Phase 1 — Foundation (complete)**
 - [x] Room persistence layer for promos (entity, DAO, repository)
 - [x] Device-level mobile data measurement (`NetworkStatsManager` wrapper,
-      mobile-only, empty-string subscriberId workaround)
+      mobile-only wildcard template query (`subscriberId = null`))
 - [x] Usage Access permission check + explicit "not granted" UI state
 - [x] StateFlow-driven ViewModel architecture (`MainViewModel`, `PromoViewModel`)
 - [x] Distinct handling for "permission denied" vs. "genuine zero usage"
@@ -115,14 +115,14 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
       zero-burn-rate cases — all covered in `BurnRateEngineTest`)
 
 **Phase 3 — UI & Background Services (complete)**
-- [x] Daily usage graph (last 7–30 days bounded by promo lifecycle with interactive inspection)
-- [x] Threshold-based local notifications (50% / 80% / 90% and premature depletion warnings with anti-re-fire tracking)
-- [x] Home screen widget (Jetpack Glance) — responsive 2x2/4x2 layouts, remaining data + total allowance, SIM badge, burn pace status, manual refresh, and placement lifecycle sync
+- [x] Daily usage graph (last 7–30 days bounded by promo lifecycle with interactive bar inspection)
+- [x] Threshold-based local notifications (50% / 80% / 90% and premature depletion warnings with anti-re-fire suppression)
+- [x] Home screen widget (Jetpack Glance) — responsive 2x2 compact and 4x2 wide layouts, remaining data + total allowance with synchronized decimal precision, SIM badge, burn pace status, manual refresh, and placement lifecycle sync
 
 ### v2 — deferred, not started
 - [ ] Multi-carrier support beyond Smart (Globe, DITO presets and balance formatting)
-- [ ] Notification-listener-based auto balance detection
-- [ ] In-place promo edit workflow (adjust allowance, validity, and remaining balance)
+- [ ] Notification-listener-based auto balance detection (`NotificationListenerService` parsing telco balance SMS / USSD alerts)
+- [ ] Dedicated promo editing UI workflow (adjust allowance, validity, and initial offset in-place)
 - [ ] Weekday/weekend usage pattern awareness
 
 ### v3 — deferred, not started
@@ -148,7 +148,7 @@ forecast to function and is requested explicitly with context, not silently.
 
 **v1 MVP Complete.** Built and verified on physical hardware (Samsung Galaxy A22 5G / SM-A226B, Android 13) against an active Smart Communications prepaid SIM.
 
-The complete v1 feature set — NetworkStats-driven mobile usage measurement, pure Kotlin mathematical forecast engine, promo management with dual-SIM context switching, native Compose daily consumption graph, threshold & premature depletion alerts with anti-re-fire suppression, and responsive 2x2/4x2 Glance home screen widgets — is implemented and verified across 45 JVM unit tests and 8 on-device instrumented tests.
+The complete v1 feature set — NetworkStats-driven mobile usage measurement, pure Kotlin mathematical forecast engine, promo management with dual-SIM context switching, native Compose daily consumption graph, threshold & premature depletion alerts with anti-re-fire suppression, and responsive 2x2/4x2 Glance home screen widgets — is implemented and verified across 54 JVM unit tests and 8 on-device instrumented tests.
 
 ## License
 

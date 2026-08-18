@@ -9,8 +9,8 @@ import com.loadpredictor.domain.time.TimeProvider
 /**
  * UseCase to retrieve daily mobile data consumption breakdown buckets for an active promo.
  *
- * Slices the query window between promo start timestamp (capped at max 30 days in the past)
- * and the current time.
+ * Slices the query window strictly from the promo start timestamp (capped at max 30 days in the past)
+ * up to the current time, ensuring historical device usage prior to promo registration is not included.
  */
 class GetDailyUsageBreakdownUseCase(
     private val usageRepository: UsageRepository,

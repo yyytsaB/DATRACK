@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,44 +19,50 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -73,9 +81,31 @@ import com.loadpredictor.presentation.dashboard.BurnAlertsOptInCard
 import com.loadpredictor.presentation.dashboard.DailyUsageChartCard
 import com.loadpredictor.presentation.promo.PromoManagementScreen
 import com.loadpredictor.presentation.promo.PromoViewModel
+import com.loadpredictor.presentation.theme.BorderHighlight
+import com.loadpredictor.presentation.theme.DarkBackground
+import com.loadpredictor.presentation.theme.DarkOutline
+import com.loadpredictor.presentation.theme.DarkOutlineVariant
+import com.loadpredictor.presentation.theme.DarkSurfaceVariant
 import com.loadpredictor.presentation.theme.LoadPredictorTheme
+import com.loadpredictor.presentation.theme.MintOnPrimary
+import com.loadpredictor.presentation.theme.MintPrimary
+import com.loadpredictor.presentation.theme.MintPrimaryContainer
+import com.loadpredictor.presentation.theme.PaceCalibratingContainer
+import com.loadpredictor.presentation.theme.PaceCalibratingText
+import com.loadpredictor.presentation.theme.PaceConservativeContainer
+import com.loadpredictor.presentation.theme.PaceConservativeText
+import com.loadpredictor.presentation.theme.PaceCritical
+import com.loadpredictor.presentation.theme.PaceCriticalContainer
+import com.loadpredictor.presentation.theme.PaceCriticalText
+import com.loadpredictor.presentation.theme.PaceOnTrackContainer
+import com.loadpredictor.presentation.theme.PaceOnTrackText
+import com.loadpredictor.presentation.theme.SurfaceLayer1
+import com.loadpredictor.presentation.theme.SurfaceLayer2
+import com.loadpredictor.presentation.theme.SurfaceRecessed
+import com.loadpredictor.presentation.theme.TextHighEmphasis
+import com.loadpredictor.presentation.theme.TextLowEmphasis
+import com.loadpredictor.presentation.theme.TextMediumEmphasis
 import com.loadpredictor.worker.WorkManagerScheduler
-import java.util.Locale
 
 enum class AppScreen {
     DASHBOARD,
@@ -125,7 +155,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     AppScreen.DASHBOARD -> {
-                        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            containerColor = DarkBackground
+                        ) { innerPadding ->
                             MainScreenContent(
                                 uiState = uiState,
                                 onGrantPermissionClick = {
@@ -157,7 +190,7 @@ fun MainScreenContent(
                 modifier = modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = MintPrimary)
             }
         }
         !uiState.isUsagePermissionGranted -> {
@@ -190,22 +223,56 @@ fun DashboardView(
     ) {
         TopAppBar(
             title = {
-                Text(
-                    text = "Burn-Rate Predictor",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            actions = {
-                IconButton(onClick = onNavigateToPromoManagement) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Manage Promos"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(
+                                color = SurfaceLayer1,
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Equalizer,
+                            contentDescription = null,
+                            tint = MintPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Load Predictor",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.02).sp,
+                        color = TextHighEmphasis
                     )
                 }
             },
+            actions = {
+                IconButton(onClick = onNavigateToPromoManagement) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                color = SurfaceLayer1,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Manage Promos",
+                            tint = TextHighEmphasis,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background,
-                titleContentColor = MaterialTheme.colorScheme.onBackground
+                containerColor = DarkBackground,
+                titleContentColor = TextHighEmphasis
             )
         )
 
@@ -257,13 +324,14 @@ fun LiveForecastHeroCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
+        border = BorderStroke(1.dp, BorderHighlight)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             // Header row: Promo name + SIM badge
             Row(
@@ -274,111 +342,206 @@ fun LiveForecastHeroCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = forecast.promo.name,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextHighEmphasis
                     )
                     Text(
                         text = if (forecast.promo.isNoExpiry) "Non-Expiring Promo" else "Expiring Promo",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = TextMediumEmphasis
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MintPrimary
                 ) {
                     Text(
                         text = if (forecast.promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = MintOnPrimary,
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Bold
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        fontWeight = FontWeight.Black
                     )
                 }
             }
 
-            // Remaining Data Callout
-            Column {
+            // Remaining Data Callout (Dominant Typography with split number + unit)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
                     remainingBytes = forecast.dataRemainingBytes,
                     totalAllowanceBytes = forecast.promo.totalAllowanceBytes
                 )
+
                 Text(
                     text = "REMAINING DATA",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    letterSpacing = 1.5.sp,
+                    color = MintPrimary
                 )
-                Text(
-                    text = dataPair.remainingFormatted,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                // Split display number & unit
+                val formattedRemaining = dataPair.remainingFormatted.trim()
+                val parts = formattedRemaining.split(" ")
+                val numberPart = parts.getOrNull(0) ?: formattedRemaining
+                val unitPart = parts.getOrNull(1) ?: ""
+
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    Text(
+                        text = numberPart,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Black,
+                        color = TextHighEmphasis,
+                        lineHeight = 50.sp
+                    )
+                    if (unitPart.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = unitPart,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextHighEmphasis,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+                }
+
                 Text(
                     text = "of ${dataPair.totalFormatted} total allowance",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                    color = TextMediumEmphasis
                 )
             }
 
-            // Progress Bar
-            LinearProgressIndicator(
-                progress = { usedRatio },
+            // Glow Progress Bar with glowing indicator dot
+            GlowingProgressBar(
+                progress = usedRatio,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp),
-                color = when (forecast.pace) {
-                    BurnPace.BURNING_FAST -> MaterialTheme.colorScheme.error
-                    BurnPace.DEPLETED -> MaterialTheme.colorScheme.error
-                    BurnPace.ON_TRACK -> MaterialTheme.colorScheme.primary
-                    BurnPace.CONSERVATIVE -> MaterialTheme.colorScheme.secondary
-                    BurnPace.INSUFFICIENT_DATA -> MaterialTheme.colorScheme.outline
-                },
-                trackColor = MaterialTheme.colorScheme.surface
+                    .height(14.dp)
             )
 
-            // Pace Pill
+            // Pace Pill (Semantic colors)
             PaceBadge(pace = forecast.pace)
 
-            // Plain language advisory block
+            // Recessed Plain language advisory container
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
+                color = SurfaceRecessed,
+                border = BorderStroke(1.dp, DarkOutlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = SurfaceLayer1,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MintPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = forecast.plainLanguageSummary,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = TextHighEmphasis
                     )
                 }
             }
 
-            // Footer actions
+            // Footer action
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                OutlinedButton(onClick = onManageClick) {
-                    Text("Switch / Edit Promo")
+                TextButton(
+                    onClick = onManageClick,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = "Switch / Edit Promo →",
+                        color = MintPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
+    }
+}
+
+/**
+ * 100% minSdk 26 compatible Canvas progress bar with ambient radial gradient indicator dot.
+ */
+@Composable
+fun GlowingProgressBar(
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val barColor = MintPrimary
+    val trackColor = SurfaceLayer2
+
+    Canvas(modifier = modifier) {
+        val strokeH = 6.dp.toPx()
+        val centerY = size.height / 2f
+        val topY = centerY - (strokeH / 2f)
+        val cornerRadius = CornerRadius(strokeH / 2f, strokeH / 2f)
+
+        // Draw track
+        drawRoundRect(
+            color = trackColor,
+            topLeft = Offset(0f, topY),
+            size = Size(size.width, strokeH),
+            cornerRadius = cornerRadius
+        )
+
+        // Draw filled progress
+        val progressWidth = (size.width * progress.coerceIn(0f, 1f)).coerceAtLeast(strokeH)
+        drawRoundRect(
+            color = barColor,
+            topLeft = Offset(0f, topY),
+            size = Size(progressWidth, strokeH),
+            cornerRadius = cornerRadius
+        )
+
+        // Draw glowing indicator dot at progress endpoint
+        val dotX = progressWidth
+        val dotRadius = 4.dp.toPx()
+        val glowRadius = 8.dp.toPx()
+
+        // Outer ambient glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(barColor.copy(alpha = 0.8f), barColor.copy(alpha = 0.2f), Color.Transparent),
+                center = Offset(dotX, centerY),
+                radius = glowRadius
+            ),
+            radius = glowRadius,
+            center = Offset(dotX, centerY)
+        )
+
+        // Inner solid white dot
+        drawCircle(
+            color = Color.White,
+            radius = dotRadius,
+            center = Offset(dotX, centerY)
+        )
     }
 }
 
@@ -386,28 +549,28 @@ fun LiveForecastHeroCard(
 fun PaceBadge(pace: BurnPace) {
     val (bgColor, textColor, label) = when (pace) {
         BurnPace.BURNING_FAST -> Triple(
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
+            PaceCriticalContainer,
+            PaceCriticalText,
             "🔥 Burning Fast"
         )
         BurnPace.ON_TRACK -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
+            PaceOnTrackContainer,
+            PaceOnTrackText,
             "⚡ Pace On Track"
         )
         BurnPace.CONSERVATIVE -> Triple(
-            MaterialTheme.colorScheme.secondaryContainer,
-            MaterialTheme.colorScheme.onSecondaryContainer,
+            PaceConservativeContainer,
+            PaceConservativeText,
             "🛡️ Conservative Pace"
         )
         BurnPace.DEPLETED -> Triple(
-            MaterialTheme.colorScheme.error,
-            MaterialTheme.colorScheme.onError,
+            PaceCriticalContainer,
+            PaceCriticalText,
             "⛔ Data Depleted"
         )
         BurnPace.INSUFFICIENT_DATA -> Triple(
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
+            PaceCalibratingContainer,
+            PaceCalibratingText,
             "⏳ Calibrating"
         )
     }
@@ -421,7 +584,7 @@ fun PaceBadge(pace: BurnPace) {
             color = textColor,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
         )
     }
 }
@@ -431,7 +594,8 @@ fun NoActivePromoCard(onConfigureClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
+        border = BorderStroke(1.dp, BorderHighlight)
     ) {
         Column(
             modifier = Modifier
@@ -440,28 +604,49 @@ fun NoActivePromoCard(onConfigureClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(
+                        color = MintPrimaryContainer.copy(alpha = 0.6f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = MintPrimary,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "No Active Promo",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = TextHighEmphasis
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Configure your Philippine prepaid data promo (e.g. Smart Magic Data or GigaSurf) to begin tracking your data burn pace.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = TextMediumEmphasis
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onConfigureClick) {
-                Text("Configure Promo")
+            Button(
+                onClick = onConfigureClick,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MintPrimary,
+                    contentColor = MintOnPrimary
+                )
+            ) {
+                Text(
+                    text = "Configure Promo",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -472,7 +657,8 @@ fun ErrorForecastCard(message: String, onManageClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        colors = CardDefaults.cardColors(containerColor = PaceCriticalContainer),
+        border = BorderStroke(1.dp, PaceCritical.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -483,27 +669,29 @@ fun ErrorForecastCard(message: String, onManageClick: () -> Unit) {
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
+                    tint = PaceCritical
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Forecast Unavailable",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    color = PaceCriticalText
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                color = PaceCriticalText
             )
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(onClick = onManageClick) {
-                Text("Check Promos")
+            OutlinedButton(
+                onClick = onManageClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Check Promos", color = TextHighEmphasis)
             }
         }
     }
 }
-

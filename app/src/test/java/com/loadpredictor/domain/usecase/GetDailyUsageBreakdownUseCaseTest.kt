@@ -22,7 +22,7 @@ class GetDailyUsageBreakdownUseCaseTest {
     }
 
     @Test
-    fun `invoke queries breakdown from promo start when start is within 30 days`() = runTest {
+    fun `invoke queries breakdown strictly from promo start when start is within 30 days`() = runTest {
         val now = 100_000_000L
         val timeProvider = FakeTimeProvider(now)
         val useCase = GetDailyUsageBreakdownUseCase(usageRepository, timeProvider)
@@ -50,6 +50,41 @@ class GetDailyUsageBreakdownUseCaseTest {
 
         assertEquals(2, result.size)
         assertEquals(expectedBuckets, result)
+        coVerify(exactly = 1) {
+            usageRepository.queryDailyUsageBreakdown(promoStart, now)
+        }
+    }
+
+    @Test
+    fun `regression - promo under 24 hours old does not include prior days before startTimestamp`() = runTest {
+        val now = 100_000_000L
+        val timeProvider = FakeTimeProvider(now)
+        val useCase = GetDailyUsageBreakdownUseCase(usageRepository, timeProvider)
+
+        // Promo registered 2 hours ago (well under 24 hours)
+        val promoStart = now - (2 * 60 * 60 * 1000L)
+        val promo = Promo(
+            id = 1L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = promoStart,
+            expirationTimestamp = null,
+            simSlot = SimSlot.SIM_1
+        )
+
+        val singleDayBucket = listOf(
+            UsageBucket(promoStart, now, 15_000L, 2_000L)
+        )
+
+        coEvery {
+            usageRepository.queryDailyUsageBreakdown(promoStart, now)
+        } returns singleDayBucket
+
+        val result = useCase(promo)
+
+        assertEquals(1, result.size)
+        assertEquals(singleDayBucket, result)
+        // Must query strictly from promoStart (2 hours ago), NOT 7 or 30 days ago
         coVerify(exactly = 1) {
             usageRepository.queryDailyUsageBreakdown(promoStart, now)
         }
