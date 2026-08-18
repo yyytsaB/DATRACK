@@ -65,9 +65,12 @@ import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.presentation.MainUiState
 import com.loadpredictor.presentation.MainViewModel
 import com.loadpredictor.presentation.common.UsagePermissionRequiredCard
+import com.loadpredictor.presentation.dashboard.BurnAlertsOptInCard
+import com.loadpredictor.presentation.dashboard.DailyUsageChartCard
 import com.loadpredictor.presentation.promo.PromoManagementScreen
 import com.loadpredictor.presentation.promo.PromoViewModel
 import com.loadpredictor.presentation.theme.LoadPredictorTheme
+import com.loadpredictor.worker.WorkManagerScheduler
 import java.util.Locale
 
 enum class AppScreen {
@@ -79,6 +82,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Schedule periodic background usage sync & threshold alerts
+        WorkManagerScheduler.schedulePeriodicSync(this)
 
         val usageAccessHelper = UsageAccessHelper(this)
 
@@ -160,7 +166,7 @@ fun MainScreenContent(
         }
         else -> {
             DashboardView(
-                forecastResult = uiState.forecastResult,
+                uiState = uiState,
                 onNavigateToPromoManagement = onNavigateToPromoManagement,
                 modifier = modifier
             )
@@ -171,7 +177,7 @@ fun MainScreenContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardView(
-    forecastResult: BurnForecastResult,
+    uiState: MainUiState,
     onNavigateToPromoManagement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -207,7 +213,10 @@ fun DashboardView(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when (forecastResult) {
+            // Notification Permission Opt-In Card
+            BurnAlertsOptInCard()
+
+            when (val forecastResult = uiState.forecastResult) {
                 is BurnForecastResult.NoActivePromo -> {
                     NoActivePromoCard(onConfigureClick = onNavigateToPromoManagement)
                 }
@@ -215,6 +224,11 @@ fun DashboardView(
                     LiveForecastHeroCard(
                         forecast = forecastResult.forecast,
                         onManageClick = onNavigateToPromoManagement
+                    )
+
+                    // Daily Usage Breakdown Chart
+                    DailyUsageChartCard(
+                        buckets = uiState.dailyUsageBreakdown
                     )
                 }
                 is BurnForecastResult.PermissionRequired -> {

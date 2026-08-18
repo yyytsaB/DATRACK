@@ -55,6 +55,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 
 # WorkManager
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workManager" }
 
 # Glance
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }

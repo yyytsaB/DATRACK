@@ -142,4 +142,78 @@ class NetworkStatsDataSourceTest {
             dataSource.queryDailyUsageBreakdown(startTime, endTime)
         }
     }
+
+    @Test
+    fun `queryDailyUsageBreakdown slices multi-day interval into 24-hour buckets and sums bytes`() {
+        val oneDayMillis = 24 * 60 * 60 * 1000L
+        val startTime = 1000L
+        val endTime = startTime + (3 * oneDayMillis) // 3 days
+
+        val bucket1 = mockk<NetworkStats.Bucket>()
+        every { bucket1.rxBytes } returns 1_000_000L
+        every { bucket1.txBytes } returns 500_000L
+
+        val bucket2 = mockk<NetworkStats.Bucket>()
+        every { bucket2.rxBytes } returns 2_000_000L
+        every { bucket2.txBytes } returns 1_000_000L
+
+        val bucket3 = mockk<NetworkStats.Bucket>()
+        every { bucket3.rxBytes } returns 500_000L
+        every { bucket3.txBytes } returns 250_000L
+
+        @Suppress("DEPRECATION")
+        every {
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                "",
+                startTime,
+                startTime + oneDayMillis
+            )
+        } returns bucket1
+
+        @Suppress("DEPRECATION")
+        every {
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                "",
+                startTime + oneDayMillis,
+                startTime + (2 * oneDayMillis)
+            )
+        } returns bucket2
+
+        @Suppress("DEPRECATION")
+        every {
+            networkStatsManager.querySummaryForDevice(
+                ConnectivityManager.TYPE_MOBILE,
+                "",
+                startTime + (2 * oneDayMillis),
+                endTime
+            )
+        } returns bucket3
+
+        val dataSource = NetworkStatsDataSource(
+            context = context,
+            customNetworkStatsManager = networkStatsManager
+        )
+
+        val buckets = dataSource.queryDailyUsageBreakdown(startTime, endTime)
+
+        assertEquals(3, buckets.size)
+
+        // Day 1
+        assertEquals(startTime, buckets[0].startTimestamp)
+        assertEquals(startTime + oneDayMillis, buckets[0].endTimestamp)
+        assertEquals(1_500_000L, buckets[0].totalBytes)
+
+        // Day 2
+        assertEquals(startTime + oneDayMillis, buckets[1].startTimestamp)
+        assertEquals(startTime + (2 * oneDayMillis), buckets[1].endTimestamp)
+        assertEquals(3_000_000L, buckets[1].totalBytes)
+
+        // Day 3
+        assertEquals(startTime + (2 * oneDayMillis), buckets[2].startTimestamp)
+        assertEquals(endTime, buckets[2].endTimestamp)
+        assertEquals(750_000L, buckets[2].totalBytes)
+    }
 }
+

@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.loadpredictor.data.local.AppDatabase
+import com.loadpredictor.data.local.NotificationPreferencesDataSource
 import com.loadpredictor.data.repository.PromoRepositoryImpl
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.usecase.GetActivePromoUseCase
 import com.loadpredictor.domain.usecase.SavePromoUseCase
+import com.loadpredictor.worker.WorkManagerScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +35,9 @@ data class PromoUiState(
 class PromoViewModel(
     private val promoRepository: PromoRepository,
     private val savePromoUseCase: SavePromoUseCase,
-    private val getActivePromoUseCase: GetActivePromoUseCase
+    private val getActivePromoUseCase: GetActivePromoUseCase,
+    private val notificationPreferences: NotificationPreferencesDataSource? = null,
+    private val onPromoMutated: (() -> Unit)? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PromoUiState())
@@ -94,6 +98,8 @@ class PromoViewModel(
                     isActive = isActive
                 )
                 val savedId = savePromoUseCase(promo)
+                notificationPreferences?.clearThresholdsForPromo(savedId)
+                onPromoMutated?.invoke()
                 onSuccess(savedId)
             } catch (e: Exception) {
                 val msg = e.localizedMessage ?: "Failed to save promo"
@@ -106,12 +112,15 @@ class PromoViewModel(
     fun selectActivePromo(promoId: Long) {
         viewModelScope.launch {
             promoRepository.setActivePromo(promoId)
+            onPromoMutated?.invoke()
         }
     }
 
     fun deletePromo(promo: Promo) {
         viewModelScope.launch {
+            notificationPreferences?.clearThresholdsForPromo(promo.id)
             promoRepository.deletePromo(promo)
+            onPromoMutated?.invoke()
         }
     }
 
@@ -129,13 +138,19 @@ class PromoViewModel(
                     val promoRepo = PromoRepositoryImpl(database.promoDao())
                     val savePromoUseCase = SavePromoUseCase(promoRepo)
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
+                    val notificationPrefs = NotificationPreferencesDataSource(appContext)
 
                     return PromoViewModel(
                         promoRepository = promoRepo,
                         savePromoUseCase = savePromoUseCase,
-                        getActivePromoUseCase = getActivePromoUseCase
+                        getActivePromoUseCase = getActivePromoUseCase,
+                        notificationPreferences = notificationPrefs,
+                        onPromoMutated = {
+                            WorkManagerScheduler.enqueueImmediateSync(appContext)
+                        }
                     ) as T
                 }
             }
     }
 }
+

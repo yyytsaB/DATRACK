@@ -91,7 +91,7 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 
 ## Roadmap
 
-### v1 — MVP (in progress)
+### v1 — MVP (Complete)
 
 **Phase 1 — Foundation (complete)**
 - [x] Room persistence layer for promos (entity, DAO, repository)
@@ -114,14 +114,15 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 - [x] Forecast engine unit tests (zero-usage, boundary, over-100%,
       zero-burn-rate cases — all covered in `BurnRateEngineTest`)
 
-**Remaining v1 feature work (UI + background services)**
-- [ ] Daily usage graph (last 7–30 days)
-- [ ] Threshold-based local notifications (50% / 80% / 90%)
-- [ ] Home screen widget (Glance) — remaining data + time, pace status
+**Phase 3 — UI & Background Services (complete)**
+- [x] Daily usage graph (last 7–30 days bounded by promo lifecycle with interactive inspection)
+- [x] Threshold-based local notifications (50% / 80% / 90% and premature depletion warnings with anti-re-fire tracking)
+- [x] Home screen widget (Jetpack Glance) — responsive 2x2/4x2 layouts, remaining data + total allowance, SIM badge, burn pace status, manual refresh, and placement lifecycle sync
 
 ### v2 — deferred, not started
+- [ ] Multi-carrier support beyond Smart (Globe, DITO presets and balance formatting)
 - [ ] Notification-listener-based auto balance detection
-- [ ] Multi-carrier support beyond Smart (Globe, DITO)
+- [ ] In-place promo edit workflow (adjust allowance, validity, and remaining balance)
 - [ ] Weekday/weekend usage pattern awareness
 
 ### v3 — deferred, not started
@@ -145,11 +146,9 @@ forecast to function and is requested explicitly with context, not silently.
 
 ## Status
 
-Actively in development as a portfolio project. Built and tested against a
-real Smart Communications prepaid SIM on physical hardware (Samsung Galaxy A22 5G / SM-A226B).
-Phase 1 (data foundation) and Phase 2 (forecast engine + promo management UI)
-are complete and verified on-device; remaining v1 work is the usage graph,
-notifications, and widget.
+**v1 MVP Complete.** Built and verified on physical hardware (Samsung Galaxy A22 5G / SM-A226B, Android 13) against an active Smart Communications prepaid SIM.
+
+The complete v1 feature set — NetworkStats-driven mobile usage measurement, pure Kotlin mathematical forecast engine, promo management with dual-SIM context switching, native Compose daily consumption graph, threshold & premature depletion alerts with anti-re-fire suppression, and responsive 2x2/4x2 Glance home screen widgets — is implemented and verified across 45 JVM unit tests and 8 on-device instrumented tests.
 
 ## License
 

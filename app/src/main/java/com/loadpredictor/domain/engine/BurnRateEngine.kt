@@ -94,10 +94,10 @@ class BurnRateEngine {
 
             if (promo.expirationTimestamp != null) {
                 estimatedDepletionTimestamp = promo.expirationTimestamp
-                plainLanguageSummary = "Calibrating burn rate: ${formatBytes(dataRemainingBytes)} remaining. Projected to last until promo expiration under baseline pace."
+                plainLanguageSummary = "Calibrating: ${formatBytes(dataRemainingBytes)} remaining, on track to expiration."
             } else {
                 estimatedDepletionTimestamp = null
-                plainLanguageSummary = "Calibrating burn rate: ${formatBytes(dataRemainingBytes)} remaining. Depletion date will be projected after initial usage."
+                plainLanguageSummary = "Calibrating pace • ${formatBytes(dataRemainingBytes)} remaining."
             }
         } else {
             // Case 3: Stabilized positive burn rate

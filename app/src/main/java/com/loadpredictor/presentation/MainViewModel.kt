@@ -13,6 +13,7 @@ import com.loadpredictor.domain.model.BurnForecastResult
 import com.loadpredictor.domain.usecase.CheckUsagePermissionUseCase
 import com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase
 import com.loadpredictor.domain.usecase.GetActivePromoUseCase
+import com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,14 +24,15 @@ import kotlinx.coroutines.flow.update
 
 /**
  * Main ViewModel coordinating top-level app state: usage permission status,
- * active promo, and real-time burn-rate forecast stream.
+ * active promo, real-time burn-rate forecast stream, and daily usage breakdown.
  *
  * Exposes immutable [StateFlow] in compliance with SKILL.md.
  */
 class MainViewModel(
     private val checkUsagePermissionUseCase: CheckUsagePermissionUseCase,
     private val getActivePromoUseCase: GetActivePromoUseCase,
-    private val getActiveBurnForecastUseCase: GetActiveBurnForecastUseCase
+    private val getActiveBurnForecastUseCase: GetActiveBurnForecastUseCase,
+    private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -58,13 +60,22 @@ class MainViewModel(
     private fun observeActivePromo() {
         getActivePromoUseCase()
             .onEach { promo ->
+                val daily = if (promo != null && getDailyUsageBreakdownUseCase != null) {
+                    try {
+                        getDailyUsageBreakdownUseCase(promo)
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
                 _uiState.update { current ->
-                    current.copy(activePromo = promo)
+                    current.copy(activePromo = promo, dailyUsageBreakdown = daily)
                 }
             }
             .catch {
                 _uiState.update { current ->
-                    current.copy(activePromo = null)
+                    current.copy(activePromo = null, dailyUsageBreakdown = emptyList())
                 }
             }
             .launchIn(viewModelScope)
@@ -126,11 +137,13 @@ class MainViewModel(
                     val checkPermissionUseCase = CheckUsagePermissionUseCase(usageRepo)
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
                     val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(promoRepo, usageRepo)
+                    val getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo)
 
                     return MainViewModel(
                         checkUsagePermissionUseCase = checkPermissionUseCase,
                         getActivePromoUseCase = getActivePromoUseCase,
-                        getActiveBurnForecastUseCase = getActiveBurnForecastUseCase
+                        getActiveBurnForecastUseCase = getActiveBurnForecastUseCase,
+                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
                     ) as T
                 }
             }
