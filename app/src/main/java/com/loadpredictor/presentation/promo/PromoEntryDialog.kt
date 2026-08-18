@@ -434,11 +434,7 @@ fun PromoEntryDialog(
                             }
 
                             val now = System.currentTimeMillis()
-                            val startTimestamp = if (initialOffsetBytes > 0L) {
-                                now - (4L * 24L * 60L * 60L * 1000L)
-                            } else {
-                                now
-                            }
+                            val startTimestamp = now
                             val expirationTimestamp: Long? = if (!isNoExpiry) {
                                 val days = durationDaysStr.toIntOrNull()
                                 if (days == null || days <= 0) {

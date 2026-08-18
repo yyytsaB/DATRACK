@@ -156,7 +156,7 @@ class BurnRateEngine {
                 // Non-expiring promo (Smart Magic Data)
                 burnStatusIndex = null
                 pace = BurnPace.ON_TRACK
-                plainLanguageSummary = "At current pace, ${promo.name} will run out on ${formatTimestamp(depletionTime)}."
+                plainLanguageSummary = "At current steady pace, ${promo.name} will run out on ${formatTimestamp(depletionTime)}."
             }
         }
 

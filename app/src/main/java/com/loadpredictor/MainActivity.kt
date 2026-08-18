@@ -427,7 +427,7 @@ fun LiveForecastHeroCard(
             )
 
             // Pace Pill (Semantic colors)
-            PaceBadge(pace = forecast.pace)
+            PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
 
             // Recessed Plain language advisory container
             Surface(
@@ -546,7 +546,7 @@ fun GlowingProgressBar(
 }
 
 @Composable
-fun PaceBadge(pace: BurnPace) {
+fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
     val (bgColor, textColor, label) = when (pace) {
         BurnPace.BURNING_FAST -> Triple(
             PaceCriticalContainer,
@@ -556,12 +556,12 @@ fun PaceBadge(pace: BurnPace) {
         BurnPace.ON_TRACK -> Triple(
             PaceOnTrackContainer,
             PaceOnTrackText,
-            "⚡ Pace On Track"
+            if (isNoExpiry) "⚡ Steady Pace" else "⚡ Pace On Track"
         )
         BurnPace.CONSERVATIVE -> Triple(
             PaceConservativeContainer,
             PaceConservativeText,
-            "🛡️ Conservative Pace"
+            if (isNoExpiry) "🛡️ Light Pace" else "🛡️ Conservative Pace"
         )
         BurnPace.DEPLETED -> Triple(
             PaceCriticalContainer,

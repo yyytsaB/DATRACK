@@ -243,7 +243,7 @@ private fun SuccessCompactLayout(state: WidgetState.Success) {
         Spacer(modifier = GlanceModifier.height(6.dp))
 
         // Pace Badge at bottom
-        PaceBadge(pace = state.pace)
+        PaceBadge(pace = state.pace, isNoExpiry = state.isNoExpiry)
     }
 }
 
@@ -275,7 +275,7 @@ private fun SuccessWideLayout(state: WidgetState.Success) {
                 textColor = GlanceTheme.colors.onPrimary
             )
             Spacer(modifier = GlanceModifier.width(6.dp))
-            PaceBadge(pace = state.pace)
+            PaceBadge(pace = state.pace, isNoExpiry = state.isNoExpiry)
             Spacer(modifier = GlanceModifier.width(6.dp))
             // Dedicated Manual Refresh Trigger
             Box(
@@ -534,10 +534,10 @@ private fun SurfaceBadge(
 }
 
 @Composable
-private fun PaceBadge(pace: BurnPace) {
+private fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
     val (label, bg, fg) = when (pace) {
         BurnPace.BURNING_FAST -> Triple("🔥 Fast", GlanceTheme.colors.errorContainer, GlanceTheme.colors.onErrorContainer)
-        BurnPace.ON_TRACK -> Triple("⚡ On Track", GlanceTheme.colors.primaryContainer, GlanceTheme.colors.onPrimaryContainer)
+        BurnPace.ON_TRACK -> Triple(if (isNoExpiry) "⚡ Steady" else "⚡ On Track", GlanceTheme.colors.primaryContainer, GlanceTheme.colors.onPrimaryContainer)
         BurnPace.CONSERVATIVE -> Triple("🛡️ Safe", GlanceTheme.colors.secondaryContainer, GlanceTheme.colors.onSecondaryContainer)
         BurnPace.DEPLETED -> Triple("⛔ Depleted", GlanceTheme.colors.error, GlanceTheme.colors.onError)
         BurnPace.INSUFFICIENT_DATA -> Triple("⏳ Calibrating", GlanceTheme.colors.surface, GlanceTheme.colors.onSurfaceVariant)

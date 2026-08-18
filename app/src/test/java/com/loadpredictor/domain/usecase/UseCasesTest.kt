@@ -174,4 +174,33 @@ class UseCasesTest {
         }
         assertEquals("Promo start timestamp cannot be in the future", thrown?.message)
     }
+
+    @Test
+    fun `SavePromoUseCase saves promo with initial offset and respects registration time without backdating`() = runTest {
+        val repo = FakePromoRepository()
+        val registrationTime = 1_700_000_000_000L
+        val timeProvider = FakeTimeProvider(currentTime = registrationTime)
+        val savePromo = SavePromoUseCase(repo, timeProvider)
+        val getActive = GetActivePromoUseCase(repo)
+
+        val totalAllowance = 24L * 1024L * 1024L * 1024L // 24 GB
+        val remainingEntered = 17_520_000_000L // 17.52 GB
+        val initialOffset = totalAllowance - remainingEntered
+
+        val promo = Promo(
+            name = "Magic Data+ 499",
+            totalAllowanceBytes = totalAllowance,
+            startTimestamp = registrationTime,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = initialOffset,
+            isActive = true
+        )
+
+        val id = savePromo(promo)
+        val saved = getActive().first()
+
+        assertEquals(id, saved?.id)
+        assertEquals(registrationTime, saved?.startTimestamp)
+        assertEquals(initialOffset, saved?.initialUsageOffsetBytes)
+    }
 }

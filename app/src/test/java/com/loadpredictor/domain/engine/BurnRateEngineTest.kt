@@ -271,7 +271,7 @@ class BurnRateEngineTest {
         val expectedDepletion = current + 90 * 3_600_000L
         assertEquals(expectedDepletion, forecast.estimatedDepletionTimestamp)
         assertFalse(forecast.plainLanguageSummary.contains("before promo expires"))
-        assertTrue(forecast.plainLanguageSummary.contains("Smart Magic Data 399 will run out on"))
+        assertTrue(forecast.plainLanguageSummary.contains("At current steady pace, Smart Magic Data 399 will run out on"))
     }
 
     @Test
