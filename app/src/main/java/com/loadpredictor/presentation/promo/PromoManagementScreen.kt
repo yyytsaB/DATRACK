@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -100,12 +101,31 @@ fun PromoManagementScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Manage Promos",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextHighEmphasis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(
+                                    color = SurfaceLayer1,
+                                    shape = RoundedCornerShape(10.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SimCard,
+                                contentDescription = null,
+                                tint = MintPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Manage Promos",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = TextHighEmphasis
+                        )
+                    }
                 },
                 navigationIcon = {
                     if (onNavigateBack != null) {

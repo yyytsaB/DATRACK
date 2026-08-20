@@ -140,12 +140,25 @@ class PromoViewModel(
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
                     val notificationPrefs = NotificationPreferencesDataSource(appContext)
 
+                    val usageHelper = com.loadpredictor.data.stats.UsageAccessHelper(appContext)
+                    val networkStatsDataSource = com.loadpredictor.data.stats.NetworkStatsDataSource(appContext)
+                    val usageRepo = com.loadpredictor.data.repository.UsageRepositoryImpl(usageHelper, networkStatsDataSource)
+
                     return PromoViewModel(
                         promoRepository = promoRepo,
                         savePromoUseCase = savePromoUseCase,
                         getActivePromoUseCase = getActivePromoUseCase,
                         notificationPreferences = notificationPrefs,
                         onPromoMutated = {
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                try {
+                                    com.loadpredictor.presentation.widget.WidgetSyncHelper.syncWidgetState(
+                                        context = appContext,
+                                        promoRepository = promoRepo,
+                                        usageRepository = usageRepo
+                                    )
+                                } catch (_: Throwable) {}
+                            }
                             WorkManagerScheduler.enqueueImmediateSync(appContext)
                         }
                     ) as T

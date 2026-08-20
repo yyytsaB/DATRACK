@@ -152,6 +152,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                androidx.activity.compose.BackHandler(enabled = currentDestination != NavDestination.HOME) {
+                    currentDestination = NavDestination.HOME
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = DarkBackground,

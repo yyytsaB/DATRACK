@@ -15,6 +15,7 @@ import com.loadpredictor.domain.model.BurnPace
 import com.loadpredictor.domain.model.UsageAccessDeniedException
 import com.loadpredictor.presentation.widget.WidgetState
 import com.loadpredictor.presentation.widget.WidgetStatePreferences
+import com.loadpredictor.presentation.widget.WidgetSyncHelper
 import kotlinx.coroutines.flow.first
 
 /**
@@ -39,101 +40,81 @@ class UsageSyncWorker(
         val notificationPrefs = NotificationPreferencesDataSource(context)
         val alertPrefsSource = com.loadpredictor.data.local.AlertPreferencesDataSource(context)
 
-        // Exit Path 1: Permission Required
-        if (!usageRepo.hasUsageAccess()) {
-            WidgetStatePreferences.saveStateAndNotify(context, WidgetState.PermissionRequired)
-            return Result.success()
-        }
+        val now = System.currentTimeMillis()
+        val widgetState = WidgetSyncHelper.syncWidgetState(
+            context = context,
+            promoRepository = promoRepo,
+            usageRepository = usageRepo,
+            burnRateEngine = burnRateEngine,
+            now = now
+        )
 
-        return try {
-            val activePromo = promoRepo.getActivePromo().first()
-
-            // Exit Path 2: No Active Promo
-            if (activePromo == null) {
-                WidgetStatePreferences.saveStateAndNotify(context, WidgetState.NoActivePromo)
-                return Result.success()
+        return when (widgetState) {
+            WidgetState.PermissionRequired,
+            WidgetState.NoActivePromo -> {
+                Result.success()
             }
-
-            val now = System.currentTimeMillis()
-            val rawUsageBytes = try {
-                usageRepo.queryMobileUsageBytes(activePromo.startTimestamp, now)
-            } catch (e: UsageAccessDeniedException) {
-                WidgetStatePreferences.saveStateAndNotify(context, WidgetState.PermissionRequired)
-                return Result.success()
+            is WidgetState.Error -> {
+                Result.failure()
             }
+            is WidgetState.Success -> {
+                try {
+                    val activePromo = promoRepo.getActivePromo().first() ?: return Result.success()
+                    val rawUsageBytes = usageRepo.queryMobileUsageBytes(activePromo.startTimestamp, now)
+                    val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
 
-            val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
+                    // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
+                    val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
+                    val usedPercentage = (usedRatio * 100.0).toInt()
+                    val notifiedThresholds = notificationPrefs.getNotifiedThresholds(activePromo.id).first()
+                    val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()
 
-            // Exit Path 3: Success -> Update Widget State
-            WidgetStatePreferences.saveStateAndNotify(
-                context,
-                WidgetState.Success(
-                    promoName = forecast.promo.name,
-                    simSlot = forecast.promo.simSlot,
-                    remainingBytes = forecast.dataRemainingBytes,
-                    totalAllowanceBytes = forecast.promo.totalAllowanceBytes,
-                    pace = forecast.pace,
-                    plainLanguageSummary = forecast.plainLanguageSummary,
-                    isNoExpiry = forecast.promo.isNoExpiry,
-                    lastUpdatedMillis = now
-                )
-            )
-
-            // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
-            val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
-            val usedPercentage = (usedRatio * 100.0).toInt()
-            val notifiedThresholds = notificationPrefs.getNotifiedThresholds(activePromo.id).first()
-            val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()
-
-            // 50%, 80%, 90% Milestones
-            val milestones = listOf(
-                50 to alertPrefs.is50Enabled,
-                80 to alertPrefs.is80Enabled,
-                90 to alertPrefs.is90Enabled
-            )
-            for ((milestone, isEnabled) in milestones) {
-                if (usedPercentage >= milestone && !notifiedThresholds.contains(milestone.toString())) {
-                    if (isEnabled) {
-                        notificationHelper.showThresholdAlert(
-                            activePromo.name,
-                            milestone,
-                            forecast.dataRemainingBytes
-                        )
+                    // 50%, 80%, 90% Milestones
+                    val milestones = listOf(
+                        50 to alertPrefs.is50Enabled,
+                        80 to alertPrefs.is80Enabled,
+                        90 to alertPrefs.is90Enabled
+                    )
+                    for ((milestone, isEnabled) in milestones) {
+                        if (usedPercentage >= milestone && !notifiedThresholds.contains(milestone.toString())) {
+                            if (isEnabled) {
+                                notificationHelper.showThresholdAlert(
+                                    activePromo.name,
+                                    milestone,
+                                    forecast.dataRemainingBytes
+                                )
+                            }
+                            // Consume milestone to prevent retroactive firing if re-enabled later
+                            notificationPrefs.recordThresholdNotified(activePromo.id, milestone.toString())
+                        }
                     }
-                    // Consume milestone to prevent retroactive firing if re-enabled later
-                    notificationPrefs.recordThresholdNotified(activePromo.id, milestone.toString())
+
+                    // Premature Depletion Alert (Expiring Promos Only)
+                    if (!activePromo.isNoExpiry &&
+                        forecast.pace == BurnPace.BURNING_FAST &&
+                        forecast.estimatedDepletionTimestamp != null &&
+                        activePromo.expirationTimestamp != null
+                    ) {
+                        val diffMs = activePromo.expirationTimestamp - forecast.estimatedDepletionTimestamp
+                        val diffHours = diffMs / 3_600_000L
+                        if (diffHours >= 12L && !notifiedThresholds.contains("PREMATURE_DEPLETION")) {
+                            if (alertPrefs.isPrematureEnabled) {
+                                notificationHelper.showPrematureDepletionAlert(
+                                    activePromo.name,
+                                    diffHours,
+                                    forecast.dataRemainingBytes
+                                )
+                            }
+                            // Consume milestone to prevent retroactive firing if re-enabled later
+                            notificationPrefs.recordThresholdNotified(activePromo.id, "PREMATURE_DEPLETION")
+                        }
+                    }
+
+                    Result.success()
+                } catch (e: Exception) {
+                    Result.failure()
                 }
             }
-
-            // Premature Depletion Alert (Expiring Promos Only)
-            if (!activePromo.isNoExpiry &&
-                forecast.pace == BurnPace.BURNING_FAST &&
-                forecast.estimatedDepletionTimestamp != null &&
-                activePromo.expirationTimestamp != null
-            ) {
-                val diffMs = activePromo.expirationTimestamp - forecast.estimatedDepletionTimestamp
-                val diffHours = diffMs / 3_600_000L
-                if (diffHours >= 12L && !notifiedThresholds.contains("PREMATURE_DEPLETION")) {
-                    if (alertPrefs.isPrematureEnabled) {
-                        notificationHelper.showPrematureDepletionAlert(
-                            activePromo.name,
-                            diffHours,
-                            forecast.dataRemainingBytes
-                        )
-                    }
-                    // Consume milestone to prevent retroactive firing if re-enabled later
-                    notificationPrefs.recordThresholdNotified(activePromo.id, "PREMATURE_DEPLETION")
-                }
-            }
-
-            Result.success()
-        } catch (e: Exception) {
-            // Exit Path 4: Error
-            WidgetStatePreferences.saveStateAndNotify(
-                context,
-                WidgetState.Error(e.localizedMessage ?: "Background sync failed")
-            )
-            Result.failure()
         }
     }
 }
