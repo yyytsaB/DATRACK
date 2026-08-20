@@ -6,11 +6,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
+import com.loadpredictor.data.local.AlertPreferencesDataSource
 import com.loadpredictor.data.local.AppDatabase
 import com.loadpredictor.data.local.NotificationPreferencesDataSource
 import com.loadpredictor.data.local.entity.PromoEntity
 import com.loadpredictor.domain.model.SimSlot
-import com.loadpredictor.presentation.widget.WidgetState
 import com.loadpredictor.presentation.widget.WidgetStatePreferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -27,6 +27,7 @@ class ThresholdNotificationFlowTest {
     private lateinit var context: Context
     private lateinit var database: AppDatabase
     private lateinit var notificationPrefs: NotificationPreferencesDataSource
+    private lateinit var alertPrefs: AlertPreferencesDataSource
     private lateinit var notificationManager: NotificationManager
 
     @Before
@@ -37,11 +38,18 @@ class ThresholdNotificationFlowTest {
         )
         database = AppDatabase.getInstance(context)
         notificationPrefs = NotificationPreferencesDataSource(context)
+        alertPrefs = AlertPreferencesDataSource(context)
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
     @Test
     fun testThresholdNotificationFiringAndAntiReFireSuppression() = runBlocking {
+        // Reset alert preferences to all true
+        alertPrefs.set50AlertEnabled(true)
+        alertPrefs.set80AlertEnabled(true)
+        alertPrefs.set90AlertEnabled(true)
+        alertPrefs.setPrematureAlertEnabled(true)
+
         // Step 1: Insert promo with 80% consumed (10 GB total, 8 GB used via initial offset, non-expiring)
         val now = System.currentTimeMillis()
         val totalAllowance = 10L * 1024L * 1024L * 1024L // 10 GB
@@ -84,5 +92,55 @@ class ThresholdNotificationFlowTest {
             androidx.datastore.preferences.core.emptyPreferences()
         )
         assertNotNull(widgetState)
+    }
+
+    @Test
+    fun testDisabledThresholdConsumesMilestonePreventingRetroactiveFiringWhenReEnabled() = runBlocking {
+        // Step 1: Disable 80% alert toggle, enable 50%
+        alertPrefs.set50AlertEnabled(true)
+        alertPrefs.set80AlertEnabled(false)
+        alertPrefs.set90AlertEnabled(true)
+
+        val now = System.currentTimeMillis()
+        val totalAllowance = 10L * 1024L * 1024L * 1024L // 10 GB
+        val initialOffset = 85L * 1024L * 1024L * 1024L / 10L // 8.5 GB (85% used)
+
+        val promoId = database.promoDao().insertPromo(
+            PromoEntity(
+                name = "Test Disabled Threshold Promo",
+                totalAllowanceBytes = totalAllowance,
+                startTimestamp = now - 3600000L,
+                expirationTimestamp = null,
+                initialUsageOffsetBytes = initialOffset,
+                simSlot = SimSlot.SIM_1,
+                isActive = true
+            )
+        )
+        database.promoDao().setActivePromo(promoId)
+        notificationPrefs.clearThresholdsForPromo(promoId)
+
+        // Step 2: Worker runs with 80% disabled -> 50% and 80% milestones are consumed into DataStore
+        val worker1 = TestListenableWorkerBuilder<UsageSyncWorker>(context).build()
+        val result1 = worker1.doWork()
+        assertEquals(ListenableWorker.Result.success(), result1)
+
+        val notifiedAfterDisabledRun = notificationPrefs.getNotifiedThresholds(promoId).first()
+        assertTrue("Expected 50% milestone to be recorded", notifiedAfterDisabledRun.contains("50"))
+        assertTrue("Expected 80% milestone to be consumed silently", notifiedAfterDisabledRun.contains("80"))
+
+        // Step 3: User re-enables 80% alert toggle later
+        alertPrefs.set80AlertEnabled(true)
+
+        // Step 4: Immediate sync runs after toggle re-enabled -> no retroactive alert because milestone was already consumed
+        val worker2 = TestListenableWorkerBuilder<UsageSyncWorker>(context).build()
+        val result2 = worker2.doWork()
+        assertEquals(ListenableWorker.Result.success(), result2)
+
+        val notifiedAfterReEnable = notificationPrefs.getNotifiedThresholds(promoId).first()
+        assertEquals(
+            "Milestone set must remain consumed and not re-fire",
+            setOf("50", "80"),
+            notifiedAfterReEnable
+        )
     }
 }

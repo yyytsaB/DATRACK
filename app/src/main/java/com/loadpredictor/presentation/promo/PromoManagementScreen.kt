@@ -2,6 +2,7 @@ package com.loadpredictor.presentation.promo
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,10 +81,19 @@ import com.loadpredictor.presentation.theme.TextMediumEmphasis
 @Composable
 fun PromoManagementScreen(
     viewModel: PromoViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedSimFilter by remember { mutableStateOf<SimSlot?>(null) } // null = All SIMs
+
+    val filteredPromos = remember(uiState.promos, selectedSimFilter) {
+        if (selectedSimFilter == null) {
+            uiState.promos
+        } else {
+            uiState.promos.filter { it.simSlot == selectedSimFilter }
+        }
+    }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -98,12 +108,14 @@ fun PromoManagementScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextHighEmphasis
-                        )
+                    if (onNavigateBack != null) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextHighEmphasis
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -141,6 +153,47 @@ fun PromoManagementScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // SIM 1 / SIM 2 Filter Segmented Buttons
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceLayer1, RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val filters = listOf(
+                        Pair(null, "All SIMs"),
+                        Pair(SimSlot.SIM_1, "SIM 1"),
+                        Pair(SimSlot.SIM_2, "SIM 2")
+                    )
+
+                    filters.forEach { (slot, title) ->
+                        val isSelected = selectedSimFilter == slot
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MintPrimary else Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp),
+                            onClick = { selectedSimFilter = slot }
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Text(
+                                    text = title,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MintOnPrimary else TextMediumEmphasis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Informative sample disclaimer callout
             item {
                 Surface(
@@ -198,14 +251,14 @@ fun PromoManagementScreen(
 
             item {
                 Text(
-                    text = "Saved Promos (${uiState.promos.size})",
+                    text = "Saved Promos (${filteredPromos.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextHighEmphasis
                 )
             }
 
-            if (uiState.promos.isEmpty()) {
+            if (filteredPromos.isEmpty()) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -220,7 +273,7 @@ fun PromoManagementScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No promos configured yet.",
+                                text = if (selectedSimFilter != null) "No promos for this SIM slot." else "No promos configured yet.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextHighEmphasis
@@ -235,7 +288,7 @@ fun PromoManagementScreen(
                     }
                 }
             } else {
-                items(uiState.promos, key = { it.id }) { promo ->
+                items(filteredPromos, key = { it.id }) { promo ->
                     PromoItemCard(
                         promo = promo,
                         isActive = (uiState.activePromo?.id == promo.id),
@@ -357,7 +410,9 @@ fun PromoItemCard(
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelectActive),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) SurfaceLayer2 else SurfaceLayer1

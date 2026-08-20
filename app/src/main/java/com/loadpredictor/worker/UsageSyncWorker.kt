@@ -37,6 +37,7 @@ class UsageSyncWorker(
         val burnRateEngine = BurnRateEngine()
         val notificationHelper = NotificationHelper(context)
         val notificationPrefs = NotificationPreferencesDataSource(context)
+        val alertPrefsSource = com.loadpredictor.data.local.AlertPreferencesDataSource(context)
 
         // Exit Path 1: Permission Required
         if (!usageRepo.hasUsageAccess()) {
@@ -78,20 +79,28 @@ class UsageSyncWorker(
                 )
             )
 
-            // Evaluate Threshold Notifications with Anti-Re-Fire
+            // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
             val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
             val usedPercentage = (usedRatio * 100.0).toInt()
             val notifiedThresholds = notificationPrefs.getNotifiedThresholds(activePromo.id).first()
+            val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()
 
             // 50%, 80%, 90% Milestones
-            val milestones = listOf(50, 80, 90)
-            for (milestone in milestones) {
+            val milestones = listOf(
+                50 to alertPrefs.is50Enabled,
+                80 to alertPrefs.is80Enabled,
+                90 to alertPrefs.is90Enabled
+            )
+            for ((milestone, isEnabled) in milestones) {
                 if (usedPercentage >= milestone && !notifiedThresholds.contains(milestone.toString())) {
-                    notificationHelper.showThresholdAlert(
-                        activePromo.name,
-                        milestone,
-                        forecast.dataRemainingBytes
-                    )
+                    if (isEnabled) {
+                        notificationHelper.showThresholdAlert(
+                            activePromo.name,
+                            milestone,
+                            forecast.dataRemainingBytes
+                        )
+                    }
+                    // Consume milestone to prevent retroactive firing if re-enabled later
                     notificationPrefs.recordThresholdNotified(activePromo.id, milestone.toString())
                 }
             }
@@ -105,11 +114,14 @@ class UsageSyncWorker(
                 val diffMs = activePromo.expirationTimestamp - forecast.estimatedDepletionTimestamp
                 val diffHours = diffMs / 3_600_000L
                 if (diffHours >= 12L && !notifiedThresholds.contains("PREMATURE_DEPLETION")) {
-                    notificationHelper.showPrematureDepletionAlert(
-                        activePromo.name,
-                        diffHours,
-                        forecast.dataRemainingBytes
-                    )
+                    if (alertPrefs.isPrematureEnabled) {
+                        notificationHelper.showPrematureDepletionAlert(
+                            activePromo.name,
+                            diffHours,
+                            forecast.dataRemainingBytes
+                        )
+                    }
+                    // Consume milestone to prevent retroactive firing if re-enabled later
                     notificationPrefs.recordThresholdNotified(activePromo.id, "PREMATURE_DEPLETION")
                 }
             }

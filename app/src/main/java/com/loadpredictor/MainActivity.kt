@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,7 +33,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -52,10 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -76,16 +69,21 @@ import com.loadpredictor.domain.model.BurnPace
 import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.presentation.MainUiState
 import com.loadpredictor.presentation.MainViewModel
+import com.loadpredictor.presentation.alerts.AlertsScreen
 import com.loadpredictor.presentation.common.UsagePermissionRequiredCard
 import com.loadpredictor.presentation.dashboard.BurnAlertsOptInCard
-import com.loadpredictor.presentation.dashboard.DailyUsageChartCard
+import com.loadpredictor.presentation.dashboard.DailyUsageTeaserCard
+import com.loadpredictor.presentation.dashboard.DashboardStatChips
+import com.loadpredictor.presentation.dashboard.RadialPaceRing
+import com.loadpredictor.presentation.history.HistoryScreen
+import com.loadpredictor.presentation.history.HistoryViewModel
+import com.loadpredictor.presentation.navigation.LoadPredictorBottomBar
+import com.loadpredictor.presentation.navigation.NavDestination
 import com.loadpredictor.presentation.promo.PromoManagementScreen
 import com.loadpredictor.presentation.promo.PromoViewModel
 import com.loadpredictor.presentation.theme.BorderHighlight
 import com.loadpredictor.presentation.theme.DarkBackground
-import com.loadpredictor.presentation.theme.DarkOutline
 import com.loadpredictor.presentation.theme.DarkOutlineVariant
-import com.loadpredictor.presentation.theme.DarkSurfaceVariant
 import com.loadpredictor.presentation.theme.LoadPredictorTheme
 import com.loadpredictor.presentation.theme.MintOnPrimary
 import com.loadpredictor.presentation.theme.MintPrimary
@@ -100,17 +98,12 @@ import com.loadpredictor.presentation.theme.PaceCriticalText
 import com.loadpredictor.presentation.theme.PaceOnTrackContainer
 import com.loadpredictor.presentation.theme.PaceOnTrackText
 import com.loadpredictor.presentation.theme.SurfaceLayer1
-import com.loadpredictor.presentation.theme.SurfaceLayer2
 import com.loadpredictor.presentation.theme.SurfaceRecessed
 import com.loadpredictor.presentation.theme.TextHighEmphasis
-import com.loadpredictor.presentation.theme.TextLowEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
+import com.loadpredictor.presentation.widget.WidgetsScreen
+import com.loadpredictor.util.DataFormatter
 import com.loadpredictor.worker.WorkManagerScheduler
-
-enum class AppScreen {
-    DASHBOARD,
-    PROMO_MANAGEMENT
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -131,9 +124,18 @@ class MainActivity : ComponentActivity() {
                 val promoViewModel: PromoViewModel = viewModel(
                     factory = PromoViewModel.provideFactory(context)
                 )
+                val historyViewModel: HistoryViewModel = viewModel(
+                    factory = HistoryViewModel.provideFactory(context)
+                )
+                val alertsViewModel: com.loadpredictor.presentation.alerts.AlertsViewModel = viewModel(
+                    factory = com.loadpredictor.presentation.alerts.AlertsViewModel.provideFactory(context)
+                )
+                val widgetsViewModel: com.loadpredictor.presentation.widget.WidgetsViewModel = viewModel(
+                    factory = com.loadpredictor.presentation.widget.WidgetsViewModel.provideFactory(context)
+                )
                 val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
-                var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
+                var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
 
                 // Lifecycle-aware foreground ticker: refreshes immediately on entry (and on resume from Settings)
                 // and every 30 seconds while in the foreground, automatically cancelling when backgrounded.
@@ -142,33 +144,68 @@ class MainActivity : ComponentActivity() {
                     lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                         while (isActive) {
                             mainViewModel.refresh()
+                            historyViewModel.refresh()
+                            alertsViewModel.refreshPermissionState()
+                            widgetsViewModel.refresh()
                             delay(30_000L)
                         }
                     }
                 }
 
-                when (currentScreen) {
-                    AppScreen.PROMO_MANAGEMENT -> {
-                        PromoManagementScreen(
-                            viewModel = promoViewModel,
-                            onNavigateBack = { currentScreen = AppScreen.DASHBOARD }
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = DarkBackground,
+                    bottomBar = {
+                        LoadPredictorBottomBar(
+                            currentDestination = currentDestination,
+                            onNavigateToDestination = { currentDestination = it }
                         )
                     }
-                    AppScreen.DASHBOARD -> {
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = DarkBackground
-                        ) { innerPadding ->
+                ) { innerPadding ->
+                    when (currentDestination) {
+                        NavDestination.HOME -> {
                             MainScreenContent(
                                 uiState = uiState,
                                 onGrantPermissionClick = {
                                     startActivity(usageAccessHelper.createUsageAccessSettingsIntent())
                                 },
-                                onNavigateToPromoManagement = {
-                                    currentScreen = AppScreen.PROMO_MANAGEMENT
+                                onNavigateToPromos = {
+                                    currentDestination = NavDestination.PROMOS
+                                },
+                                onNavigateToHistory = {
+                                    currentDestination = NavDestination.HISTORY
                                 },
                                 modifier = Modifier.padding(innerPadding)
                             )
+                        }
+                        NavDestination.PROMOS -> {
+                            Box(modifier = Modifier.padding(innerPadding)) {
+                                PromoManagementScreen(
+                                    viewModel = promoViewModel,
+                                    onNavigateBack = null
+                                )
+                            }
+                        }
+                        NavDestination.HISTORY -> {
+                            Box(modifier = Modifier.padding(innerPadding)) {
+                                HistoryScreen(
+                                    viewModel = historyViewModel
+                                )
+                            }
+                        }
+                        NavDestination.ALERTS -> {
+                            Box(modifier = Modifier.padding(innerPadding)) {
+                                AlertsScreen(
+                                    viewModel = alertsViewModel
+                                )
+                            }
+                        }
+                        NavDestination.WIDGETS -> {
+                            Box(modifier = Modifier.padding(innerPadding)) {
+                                WidgetsScreen(
+                                    viewModel = widgetsViewModel
+                                )
+                            }
                         }
                     }
                 }
@@ -181,7 +218,8 @@ class MainActivity : ComponentActivity() {
 fun MainScreenContent(
     uiState: MainUiState,
     onGrantPermissionClick: () -> Unit,
-    onNavigateToPromoManagement: () -> Unit,
+    onNavigateToPromos: () -> Unit,
+    onNavigateToHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     when {
@@ -202,7 +240,8 @@ fun MainScreenContent(
         else -> {
             DashboardView(
                 uiState = uiState,
-                onNavigateToPromoManagement = onNavigateToPromoManagement,
+                onNavigateToPromos = onNavigateToPromos,
+                onNavigateToHistory = onNavigateToHistory,
                 modifier = modifier
             )
         }
@@ -213,7 +252,8 @@ fun MainScreenContent(
 @Composable
 fun DashboardView(
     uiState: MainUiState,
-    onNavigateToPromoManagement: () -> Unit,
+    onNavigateToPromos: () -> Unit,
+    onNavigateToHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -250,26 +290,6 @@ fun DashboardView(
                     )
                 }
             },
-            actions = {
-                IconButton(onClick = onNavigateToPromoManagement) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(
-                                color = SurfaceLayer1,
-                                shape = CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Manage Promos",
-                            tint = TextHighEmphasis,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = DarkBackground,
                 titleContentColor = TextHighEmphasis
@@ -287,17 +307,21 @@ fun DashboardView(
 
             when (val forecastResult = uiState.forecastResult) {
                 is BurnForecastResult.NoActivePromo -> {
-                    NoActivePromoCard(onConfigureClick = onNavigateToPromoManagement)
+                    NoActivePromoCard(onConfigureClick = onNavigateToPromos)
                 }
                 is BurnForecastResult.Success -> {
                     LiveForecastHeroCard(
                         forecast = forecastResult.forecast,
-                        onManageClick = onNavigateToPromoManagement
+                        dailyAvgBytes = uiState.dailyUsageBreakdown.let { list ->
+                            if (list.isEmpty()) 0L else list.map { it.totalBytes }.average().toLong()
+                        },
+                        onNavigateToPromos = onNavigateToPromos
                     )
 
-                    // Daily Usage Breakdown Chart
-                    DailyUsageChartCard(
-                        buckets = uiState.dailyUsageBreakdown
+                    // Daily Usage Breakdown Teaser Strip
+                    DailyUsageTeaserCard(
+                        buckets = uiState.dailyUsageBreakdown,
+                        onViewHistoryClick = onNavigateToHistory
                     )
                 }
                 is BurnForecastResult.PermissionRequired -> {
@@ -306,7 +330,7 @@ fun DashboardView(
                 is BurnForecastResult.Error -> {
                     ErrorForecastCard(
                         message = forecastResult.message,
-                        onManageClick = onNavigateToPromoManagement
+                        onManageClick = onNavigateToPromos
                     )
                 }
             }
@@ -317,9 +341,14 @@ fun DashboardView(
 @Composable
 fun LiveForecastHeroCard(
     forecast: BurnForecast,
-    onManageClick: () -> Unit
+    dailyAvgBytes: Long,
+    onNavigateToPromos: () -> Unit
 ) {
-    val usedRatio = (forecast.dataUsedBytes.toFloat() / forecast.promo.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
+    val remainingRatio = (forecast.dataRemainingBytes.toFloat() / forecast.promo.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
+    val dataPair = DataFormatter.formatDataPair(
+        remainingBytes = forecast.dataRemainingBytes,
+        totalAllowanceBytes = forecast.promo.totalAllowanceBytes
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -367,67 +396,34 @@ fun LiveForecastHeroCard(
                 }
             }
 
-            // Remaining Data Callout (Dominant Typography with split number + unit)
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
-                    remainingBytes = forecast.dataRemainingBytes,
-                    totalAllowanceBytes = forecast.promo.totalAllowanceBytes
-                )
-
-                Text(
-                    text = "REMAINING DATA",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.5.sp,
-                    color = MintPrimary
-                )
-
-                // Split display number & unit
-                val formattedRemaining = dataPair.remainingFormatted.trim()
-                val parts = formattedRemaining.split(" ")
-                val numberPart = parts.getOrNull(0) ?: formattedRemaining
-                val unitPart = parts.getOrNull(1) ?: ""
-
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    modifier = Modifier.padding(vertical = 2.dp)
-                ) {
-                    Text(
-                        text = numberPart,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Black,
-                        color = TextHighEmphasis,
-                        lineHeight = 50.sp
-                    )
-                    if (unitPart.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = unitPart,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextHighEmphasis,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "of ${dataPair.totalFormatted} total allowance",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-                    color = TextMediumEmphasis
+            // Radial Progress Ring (Pace Tinted)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                RadialPaceRing(
+                    remainingRatio = remainingRatio,
+                    remainingFormatted = dataPair.remainingFormatted,
+                    totalAllowanceFormatted = dataPair.totalFormatted,
+                    pace = forecast.pace,
+                    size = 210.dp,
+                    strokeWidth = 14.dp
                 )
             }
 
-            // Glow Progress Bar with glowing indicator dot
-            GlowingProgressBar(
-                progress = usedRatio,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(14.dp)
-            )
-
             // Pace Pill (Semantic colors)
-            PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
+            }
+
+            // 3 Stat Chips (Daily avg, Days left / Validity, At this pace)
+            DashboardStatChips(
+                forecast = forecast,
+                dailyAvgBytes = dailyAvgBytes
+            )
 
             // Recessed Plain language advisory container
             Surface(
@@ -472,7 +468,7 @@ fun LiveForecastHeroCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    onClick = onManageClick,
+                    onClick = onNavigateToPromos,
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -483,65 +479,6 @@ fun LiveForecastHeroCard(
                 }
             }
         }
-    }
-}
-
-/**
- * 100% minSdk 26 compatible Canvas progress bar with ambient radial gradient indicator dot.
- */
-@Composable
-fun GlowingProgressBar(
-    progress: Float,
-    modifier: Modifier = Modifier
-) {
-    val barColor = MintPrimary
-    val trackColor = SurfaceLayer2
-
-    Canvas(modifier = modifier) {
-        val strokeH = 6.dp.toPx()
-        val centerY = size.height / 2f
-        val topY = centerY - (strokeH / 2f)
-        val cornerRadius = CornerRadius(strokeH / 2f, strokeH / 2f)
-
-        // Draw track
-        drawRoundRect(
-            color = trackColor,
-            topLeft = Offset(0f, topY),
-            size = Size(size.width, strokeH),
-            cornerRadius = cornerRadius
-        )
-
-        // Draw filled progress
-        val progressWidth = (size.width * progress.coerceIn(0f, 1f)).coerceAtLeast(strokeH)
-        drawRoundRect(
-            color = barColor,
-            topLeft = Offset(0f, topY),
-            size = Size(progressWidth, strokeH),
-            cornerRadius = cornerRadius
-        )
-
-        // Draw glowing indicator dot at progress endpoint
-        val dotX = progressWidth
-        val dotRadius = 4.dp.toPx()
-        val glowRadius = 8.dp.toPx()
-
-        // Outer ambient glow
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(barColor.copy(alpha = 0.8f), barColor.copy(alpha = 0.2f), Color.Transparent),
-                center = Offset(dotX, centerY),
-                radius = glowRadius
-            ),
-            radius = glowRadius,
-            center = Offset(dotX, centerY)
-        )
-
-        // Inner solid white dot
-        drawCircle(
-            color = Color.White,
-            radius = dotRadius,
-            center = Offset(dotX, centerY)
-        )
     }
 }
 
