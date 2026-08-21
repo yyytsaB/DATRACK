@@ -77,35 +77,20 @@ fun InteractiveUsageChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header with Selected Day Tooltip Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Daily Consumption",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextHighEmphasis
-                    )
-                    Text(
-                        text = "Tap a bar to inspect daily usage",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMediumEmphasis
-                    )
-                }
+            // Optional Inspection Tooltip if user tapped a bar
+            val selectedBucket = if (selectedBucketTimestamp != null) {
+                buckets.find { it.startTimestamp == selectedBucketTimestamp } ?: buckets.lastOrNull()
+            } else {
+                null
+            }
 
-                val selectedBucket = if (selectedBucketTimestamp != null) {
-                    buckets.find { it.startTimestamp == selectedBucketTimestamp } ?: buckets.lastOrNull()
-                } else {
-                    buckets.lastOrNull()
-                }
-
-                if (selectedBucket != null) {
+            if (selectedBucket != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = PurpleBadgeBackground,
@@ -113,10 +98,10 @@ fun InteractiveUsageChart(
                     ) {
                         Text(
                             text = "${formatDayLabel(selectedBucket.startTimestamp)}: ${DataFormatter.formatBytes(selectedBucket.totalBytes)}",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = PurpleBadgeText,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
                 }
@@ -126,29 +111,26 @@ fun InteractiveUsageChart(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
-                        .background(SurfaceRecessed, shape = RoundedCornerShape(16.dp)),
+                        .height(150.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "📊 Initializing daily history...\nUsage will be plotted as device traffic occurs.",
+                        text = "No usage records available to plot.",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = TextMediumEmphasis,
-                        lineHeight = 20.sp
+                        color = TextMediumEmphasis
                     )
                 }
             } else {
                 val maxBytes = buckets.maxOf { it.totalBytes }.coerceAtLeast(1024L * 1024L) // at least 1 MB
                 val averageBytes = buckets.map { it.totalBytes }.average()
 
-                // Recessed Chart Stage
+                // Direct Chart Stage
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(170.dp)
-                        .background(SurfaceRecessed, shape = RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 16.dp)
+                        .height(160.dp)
+                        .padding(horizontal = 4.dp)
                 ) {
                     // Average Line Canvas
                     Canvas(
@@ -158,7 +140,7 @@ fun InteractiveUsageChart(
                     ) {
                         val avgY = size.height * (1f - (averageBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f))
                         drawLine(
-                            color = DarkOutline,
+                            color = Color(0xFF263244),
                             start = Offset(0f, avgY),
                             end = Offset(size.width, avgY),
                             strokeWidth = 2f,
@@ -174,9 +156,9 @@ fun InteractiveUsageChart(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        // Display up to 14 bars max in the viewport for clean readability
+                        // Display up to 14 bars max
                         val displayBuckets = if (buckets.size > 14) buckets.takeLast(14) else buckets
-                        displayBuckets.forEach { bucket ->
+                        displayBuckets.forEachIndexed { index, bucket ->
                             val isSelected = (bucket.startTimestamp == (selectedBucketTimestamp ?: buckets.lastOrNull()?.startTimestamp))
                             val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
                             val animatedHeightFraction by animateFloatAsState(
@@ -203,23 +185,26 @@ fun InteractiveUsageChart(
                                         modifier = Modifier
                                             .fillMaxWidth(if (displayBuckets.size <= 7) 0.55f else 0.70f)
                                             .fillMaxHeight(animatedHeightFraction)
-                                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                             .background(
                                                 if (isSelected) MintPrimary
-                                                else Color(0xFF2D3442)
+                                                else Color(0xFF14B8A6).copy(alpha = 0.75f)
                                             )
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
+                                // Show date label for every ~3 bars or endpoints
+                                val showLabel = displayBuckets.size <= 7 || index % 3 == 0 || index == displayBuckets.lastIndex
                                 Text(
-                                    text = formatShortDay(bucket.startTimestamp),
+                                    text = if (showLabel) formatShortDay(bucket.startTimestamp) else "",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp,
-                                    color = if (isSelected) MintPrimary else TextMediumEmphasis,
+                                    color = if (isSelected) MintPrimary else TextLowEmphasis,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    textAlign = TextAlign.Center
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -240,7 +225,7 @@ fun InteractiveUsageChart(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Dashed line shows the average daily burn rate across this period.",
+                    text = "Dashed line shows the average daily burn rate.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextLowEmphasis
                 )

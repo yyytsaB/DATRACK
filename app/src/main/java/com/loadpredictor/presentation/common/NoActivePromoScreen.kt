@@ -1,20 +1,20 @@
 package com.loadpredictor.presentation.common
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,32 +29,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loadpredictor.presentation.theme.DarkBackground
+import com.loadpredictor.presentation.theme.MintOnPrimary
+import com.loadpredictor.presentation.theme.MintPrimary
 import com.loadpredictor.presentation.theme.TextHighEmphasis
-import com.loadpredictor.presentation.theme.TextLowEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
 
 /**
- * 1-to-1 exact replica of the Usage Access permission screen matching preview (1).webp:
+ * 1-to-1 exact replica of the No Active Promo empty state screen matching preview (2).webp:
  * - TopAppBar: "Load Predictor" title + circular 3-dots overflow button
- * - Centered circular dark crimson badge with salmon warning icon
- * - "Usage Access needed" hero title
- * - Informative privacy explanation body
- * - Salmon/coral "Grant Access" primary button
- * - "We can't read messages, calls, or app content." reassurance caption
+ * - Centered circular dark teal badge with dashed mint circle and exclamation mark
+ * - "No active promo" hero title
+ * - "Set up your data promo to start tracking how long it will last." copy
+ * - Mint "Set up your promo" pill button
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsagePermissionRequiredCard(
-    onGrantPermissionClick: () -> Unit,
+fun NoActivePromoScreen(
+    onConfigureClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val coralPrimary = Color(0xFFFF6F6F)
-    val crimsonBadgeBg = Color(0xFF2B171C)
+    val mintTeal = MintPrimary
+    val darkTealBadgeBg = Color(0xFF102123)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -105,18 +107,27 @@ fun UsagePermissionRequiredCard(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Circular Dark Crimson Warning Badge
+            // Circular Dark Teal Badge with Dashed Ring and Exclamation Mark
             Box(
                 modifier = Modifier
                     .size(88.dp)
-                    .background(crimsonBadgeBg, CircleShape),
+                    .background(darkTealBadgeBg, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.WarningAmber,
-                    contentDescription = "Warning",
-                    tint = coralPrimary,
-                    modifier = Modifier.size(38.dp)
+                Canvas(modifier = Modifier.size(46.dp)) {
+                    val strokeWidth = 2.dp.toPx()
+                    val pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    drawCircle(
+                        color = mintTeal,
+                        style = Stroke(width = strokeWidth, pathEffect = pathEffect)
+                    )
+                }
+                Text(
+                    text = "!",
+                    color = mintTeal,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    textAlign = TextAlign.Center
                 )
             }
 
@@ -124,56 +135,46 @@ fun UsagePermissionRequiredCard(
 
             // Title
             Text(
-                text = "Usage Access needed",
+                text = "No active promo",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextHighEmphasis,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Body Description
             Text(
-                text = "Datrack reads your network usage from Android's Usage Access — no personal data leaves your phone. This is the only way it can track your burn rate.",
+                text = "Set up your data promo to start tracking how long it will last.",
                 fontSize = 14.sp,
                 color = TextMediumEmphasis,
                 textAlign = TextAlign.Center,
                 lineHeight = 22.sp,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // Grant Access Button
+            // Set up your promo Button
             Button(
-                onClick = onGrantPermissionClick,
+                onClick = onConfigureClick,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(20.dp),
+                    .width(220.dp)
+                    .height(50.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = coralPrimary,
-                    contentColor = Color.White
+                    containerColor = mintTeal,
+                    contentColor = MintOnPrimary
                 )
             ) {
                 Text(
-                    text = "Grant Access",
-                    fontSize = 16.sp,
+                    text = "Set up your promo",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MintOnPrimary
                 )
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Reassurance Caption
-            Text(
-                text = "We can't read messages, calls, or app content.",
-                fontSize = 12.sp,
-                color = TextLowEmphasis,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

@@ -51,6 +51,7 @@ fun LoadPredictorTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = LoadPredictorTypography,
         content = content
     )
 }

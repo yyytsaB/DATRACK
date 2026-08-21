@@ -1,7 +1,12 @@
 package com.loadpredictor.presentation.widget
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -9,12 +14,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -26,16 +33,19 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import com.loadpredictor.MainActivity
 import com.loadpredictor.data.local.AppDatabase
 import com.loadpredictor.data.repository.PromoRepositoryImpl
@@ -46,32 +56,32 @@ import com.loadpredictor.domain.engine.BurnRateEngine
 import com.loadpredictor.domain.model.BurnPace
 import com.loadpredictor.domain.model.SimSlot
 import com.loadpredictor.presentation.theme.LoadPredictorGlanceColorScheme
+import com.loadpredictor.presentation.theme.getDataProgressColor
+import com.loadpredictor.presentation.theme.getDataProgressIntColor
+import com.loadpredictor.util.DataFormatter
 import kotlinx.coroutines.flow.first
 
 /**
- * Material 3 Jetpack Glance home screen widget for LoadPredictor.
+ * Material 3 Jetpack Glance home screen widget for Datrack.
  *
- * Implements elevated dark responsive layouts for 2x2 (compact) and 4x2 (wide) dimensions:
- * - SurfaceLayer1 (#131722) elevated card surface
- * - Mint SIM pill and dominant crisp white hero typography
- * - Recessed depletion advisory callout container (#0C0F16)
- * - Semantic pace badges
+ * Implements single-row 2x1 (compact) and 4x1 (wide) horizontal layouts:
+ * - 2x1: Circular progress ring + remaining balance + SIM/Pace label
+ * - 4x1: Left column (Brand/SIM + Remaining balance) + Right column (Linear bar + ETA/Pace)
  */
 class LoadPredictorWidget : GlanceAppWidget() {
 
     companion object {
-        private val SMALL_SQUARE = DpSize(130.dp, 100.dp)
-        private val HORIZONTAL_RECTANGLE = DpSize(250.dp, 100.dp)
+        private val SIZE_2X1 = DpSize(110.dp, 40.dp)
+        private val SIZE_4X1 = DpSize(220.dp, 40.dp)
     }
 
     override var sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(SMALL_SQUARE, HORIZONTAL_RECTANGLE)
+        setOf(SIZE_2X1, SIZE_4X1)
     )
 
     override var stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Guarantee immediate state population upon widget placement / inflation
         try {
             val usageHelper = UsageAccessHelper(context)
             val database = AppDatabase.getInstance(context)
@@ -121,7 +131,7 @@ class LoadPredictorWidget : GlanceAppWidget() {
                 val preferences = currentState<Preferences>()
                 val state = WidgetStatePreferences.readState(preferences)
                 val size = LocalSize.current
-                val isWide = size.width >= 230.dp
+                val isWide = size.width >= 210.dp
 
                 WidgetRoot(state = state, isWide = isWide)
             }
@@ -135,15 +145,15 @@ private fun WidgetRoot(state: WidgetState, isWide: Boolean) {
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
-            .background(GlanceTheme.colors.surfaceVariant)
+            .background(ColorProvider(Color(0xFF131722)))
             .cornerRadius(20.dp)
-            .padding(14.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
     ) {
         when (state) {
             is WidgetState.Success -> {
-                if (isWide) SuccessWideLayout(state = state) else SuccessCompactLayout(state = state)
+                if (isWide) Success4x1Layout(state = state) else Success2x1Layout(state = state)
             }
             is WidgetState.NoActivePromo -> {
                 if (isWide) NoActivePromoWideLayout() else NoActivePromoCompactLayout()
@@ -159,194 +169,168 @@ private fun WidgetRoot(state: WidgetState, isWide: Boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// Success Layouts (2x2 vs 4x2)
+// 2x1 and 4x1 Success Layouts
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun SuccessCompactLayout(state: WidgetState.Success) {
-    Column(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        // Top Header: Promo Name + SIM badge + Refresh Button
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Vertical.CenterVertically
-        ) {
-            Text(
-                text = state.promoName,
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                ),
-                maxLines = 1,
-                modifier = GlanceModifier.defaultWeight()
-            )
-            Spacer(modifier = GlanceModifier.width(4.dp))
-            SurfaceBadge(
-                text = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
-                bgColor = GlanceTheme.colors.primary,
-                textColor = GlanceTheme.colors.onPrimary
-            )
-            Spacer(modifier = GlanceModifier.width(4.dp))
-            Box(
-                modifier = GlanceModifier
-                    .background(GlanceTheme.colors.surface)
-                    .cornerRadius(6.dp)
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .clickable(actionRunCallback<RefreshWidgetCallback>())
-            ) {
-                Text(
-                    text = "🔄",
-                    style = TextStyle(fontSize = 8.sp)
-                )
-            }
-        }
-
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
-        val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
-            remainingBytes = state.remainingBytes,
-            totalAllowanceBytes = state.totalAllowanceBytes
-        )
-
-        Text(
-            text = "REMAINING",
-            style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 9.sp
-            )
-        )
-
-        // Hero Remaining Number (Dominant Hierarchy - Crisp White)
-        Text(
-            text = dataPair.remainingFormatted,
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontSize = 26.sp
-            ),
-            maxLines = 1
-        )
-
-        Text(
-            text = "of ${dataPair.totalFormatted}",
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 11.sp
-            ),
-            maxLines = 1
-        )
-
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
-        // Pace Badge at bottom
-        PaceBadge(pace = state.pace, isNoExpiry = state.isNoExpiry)
+private fun Success2x1Layout(state: WidgetState.Success) {
+    val remainingFraction = if (state.totalAllowanceBytes > 0L) {
+        (state.remainingBytes.toFloat() / state.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
     }
-}
+    val ringBitmap = renderGlanceRingBitmap(progress = remainingFraction, remainingRatio = remainingFraction)
+    val dataPair = DataFormatter.formatDataPair(
+        remainingBytes = state.remainingBytes,
+        totalAllowanceBytes = state.totalAllowanceBytes
+    )
+    val paceColorProvider = getGlancePaceColor(state.pace)
+    val paceLabel = getGlancePaceLabel(state.pace, state.isNoExpiry)
+    val simLabel = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
 
-@Composable
-private fun SuccessWideLayout(state: WidgetState.Success) {
-    Column(
+    Row(
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
-        // Header Row: Promo Name + SIM badge + Wide Pace Pill + Manual Refresh
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Vertical.CenterVertically
-        ) {
-            Text(
-                text = state.promoName,
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                ),
-                maxLines = 1,
-                modifier = GlanceModifier.defaultWeight()
-            )
-            Spacer(modifier = GlanceModifier.width(6.dp))
-            SurfaceBadge(
-                text = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
-                bgColor = GlanceTheme.colors.primary,
-                textColor = GlanceTheme.colors.onPrimary
-            )
-            Spacer(modifier = GlanceModifier.width(6.dp))
-            PaceBadge(pace = state.pace, isNoExpiry = state.isNoExpiry)
-            Spacer(modifier = GlanceModifier.width(6.dp))
-            // Dedicated Manual Refresh Trigger
-            Box(
-                modifier = GlanceModifier
-                    .background(GlanceTheme.colors.surface)
-                    .cornerRadius(6.dp)
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .clickable(actionRunCallback<RefreshWidgetCallback>())
-            ) {
-                Text(
-                    text = "🔄",
-                    style = TextStyle(fontSize = 10.sp)
-                )
-            }
-        }
-
-        Spacer(modifier = GlanceModifier.height(8.dp))
-
-        val dataPair = com.loadpredictor.util.DataFormatter.formatDataPair(
-            remainingBytes = state.remainingBytes,
-            totalAllowanceBytes = state.totalAllowanceBytes
+        // Left: Circular Ring Bitmap
+        Image(
+            provider = ImageProvider(ringBitmap),
+            contentDescription = null,
+            modifier = GlanceModifier.size(40.dp)
         )
 
-        // Hero Row
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Vertical.Bottom
+        Spacer(modifier = GlanceModifier.width(10.dp))
+
+        // Right: Amount + SIM/Pace label
+        Column(
+            modifier = GlanceModifier.defaultWeight(),
+            verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
             Text(
                 text = dataPair.remainingFormatted,
                 style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
+                    color = ColorProvider(Color(0xFFFFFFFF)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
+                    fontSize = 18.sp
                 ),
                 maxLines = 1
             )
-            Spacer(modifier = GlanceModifier.width(8.dp))
-            Text(
-                text = "of ${dataPair.totalFormatted} allowance",
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurfaceVariant,
-                    fontSize = 12.sp
-                ),
-                maxLines = 1
-            )
+            Spacer(modifier = GlanceModifier.height(1.dp))
+            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                Text(
+                    text = "$simLabel • ",
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF8E99A8)),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                Text(
+                    text = paceLabel,
+                    style = TextStyle(
+                        color = paceColorProvider,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    maxLines = 1
+                )
+            }
         }
+    }
+}
 
-        Spacer(modifier = GlanceModifier.height(8.dp))
+@Composable
+private fun Success4x1Layout(state: WidgetState.Success) {
+    val remainingFraction = if (state.totalAllowanceBytes > 0L) {
+        (state.remainingBytes.toFloat() / state.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val dataPair = DataFormatter.formatDataPair(
+        remainingBytes = state.remainingBytes,
+        totalAllowanceBytes = state.totalAllowanceBytes
+    )
+    val paceColorProvider = getGlancePaceColor(state.pace)
+    val paceLabel = getGlancePaceLabel(state.pace, state.isNoExpiry)
+    val simLabel = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
+    val progressColor = getDataProgressColor(remainingFraction)
 
-        // Recessed Depletion Advisory Callout Box
-        val projectionText = state.plainLanguageSummary.ifBlank {
-            "Calibrating pace • ${dataPair.remainingFormatted} remaining"
-        }
-
-        Box(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .background(GlanceTheme.colors.surface)
-                .cornerRadius(8.dp)
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        // Left Column: Brand/SIM + Remaining balance
+        Column(
+            modifier = GlanceModifier.defaultWeight(),
+            verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
-            Text(
-                text = "⚡ $projectionText",
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                maxLines = 1
+            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                Text(
+                    text = "DATRACK",
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF00F5D4)),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp
+                    )
+                )
+                Text(
+                    text = " • $simLabel",
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF8E99A8)),
+                        fontSize = 10.sp
+                    )
+                )
+            }
+            Spacer(modifier = GlanceModifier.height(1.dp))
+            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                Text(
+                    text = dataPair.remainingFormatted,
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFFFFFFFF)),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                )
+                Text(
+                    text = " / ${dataPair.totalFormatted}",
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF8E99A8)),
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = GlanceModifier.width(12.dp))
+
+        // Right Column: Linear Progress Bar + ETA / Pace Status
+        Column(
+            modifier = GlanceModifier.defaultWeight(),
+            verticalAlignment = Alignment.Vertical.CenterVertically
+        ) {
+            LinearProgressIndicator(
+                progress = remainingFraction,
+                modifier = GlanceModifier.fillMaxWidth().height(6.dp),
+                color = ColorProvider(progressColor),
+                backgroundColor = ColorProvider(Color(0xFF252D3D))
             )
+            Spacer(modifier = GlanceModifier.height(4.dp))
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Vertical.CenterVertically
+            ) {
+                val etaSummary = state.plainLanguageSummary.ifBlank { paceLabel }
+                Text(
+                    text = etaSummary,
+                    style = TextStyle(
+                        color = paceColorProvider,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp
+                    ),
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+            }
         }
     }
 }
@@ -357,24 +341,25 @@ private fun SuccessWideLayout(state: WidgetState.Success) {
 
 @Composable
 private fun NoActivePromoCompactLayout() {
-    Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.CenterHorizontally
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         Text(
-            text = "No Promo",
+            text = "No Active Promo",
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
+                color = ColorProvider(Color(0xFFFFFFFF)),
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
+                fontSize = 13.sp
+            ),
+            modifier = GlanceModifier.defaultWeight()
         )
-        Spacer(modifier = GlanceModifier.height(2.dp))
         Text(
-            text = "Tap to set up",
+            text = "Set up →",
             style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontSize = 11.sp
+                color = ColorProvider(Color(0xFF00F5D4)),
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
             )
         )
     }
@@ -382,24 +367,33 @@ private fun NoActivePromoCompactLayout() {
 
 @Composable
 private fun NoActivePromoWideLayout() {
-    Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.Start
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
-        Text(
-            text = "No Active Promo Configured",
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Text(
+                text = "No Active Promo Tracked",
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFFFFFFFF)),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             )
-        )
-        Spacer(modifier = GlanceModifier.height(2.dp))
+            Text(
+                text = "Tap to configure a Smart promo",
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFF8E99A8)),
+                    fontSize = 11.sp
+                )
+            )
+        }
         Text(
-            text = "Tap to track your Philippine prepaid mobile data",
+            text = "Set up →",
             style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontSize = 11.sp
+                color = ColorProvider(Color(0xFF00F5D4)),
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
             )
         )
     }
@@ -407,23 +401,24 @@ private fun NoActivePromoWideLayout() {
 
 @Composable
 private fun PermissionRequiredCompactLayout() {
-    Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.CenterHorizontally
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         Text(
-            text = "⚠️ Usage Access",
+            text = "Permission Needed",
             style = TextStyle(
-                color = GlanceTheme.colors.error,
+                color = ColorProvider(Color(0xFFFACC15)),
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
-            )
+            ),
+            modifier = GlanceModifier.defaultWeight()
         )
-        Spacer(modifier = GlanceModifier.height(2.dp))
         Text(
-            text = "Tap to grant",
+            text = "Grant →",
             style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
+                color = ColorProvider(Color(0xFF00F5D4)),
+                fontWeight = FontWeight.Bold,
                 fontSize = 11.sp
             )
         )
@@ -432,24 +427,33 @@ private fun PermissionRequiredCompactLayout() {
 
 @Composable
 private fun PermissionRequiredWideLayout() {
-    Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.Start
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
-        Text(
-            text = "⚠️ Usage Access Required",
-            style = TextStyle(
-                color = GlanceTheme.colors.error,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Text(
+                text = "Usage Access Required",
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFFFACC15)),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
             )
-        )
-        Spacer(modifier = GlanceModifier.height(2.dp))
+            Text(
+                text = "Tap to grant Usage Access in Settings",
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFF8E99A8)),
+                    fontSize = 11.sp
+                )
+            )
+        }
         Text(
-            text = "Tap to enable system permission for mobile data tracking",
+            text = "Grant →",
             style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 11.sp
+                color = ColorProvider(Color(0xFF00F5D4)),
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
             )
         )
     }
@@ -457,24 +461,16 @@ private fun PermissionRequiredWideLayout() {
 
 @Composable
 private fun ErrorCompactLayout() {
-    Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.CenterHorizontally
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         Text(
-            text = "Sync Error",
+            text = "Forecast Unavailable",
             style = TextStyle(
-                color = GlanceTheme.colors.error,
+                color = ColorProvider(Color(0xFFFF4D4D)),
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
-            )
-        )
-        Spacer(modifier = GlanceModifier.height(2.dp))
-        Text(
-            text = "Tap to retry",
-            style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontSize = 11.sp
             )
         )
     }
@@ -483,22 +479,21 @@ private fun ErrorCompactLayout() {
 @Composable
 private fun ErrorWideLayout(message: String) {
     Column(
-        modifier = GlanceModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Horizontal.Start
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         Text(
-            text = "Forecast Unavailable",
+            text = "Forecast Error",
             style = TextStyle(
-                color = GlanceTheme.colors.error,
+                color = ColorProvider(Color(0xFFFF4D4D)),
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp
             )
         )
-        Spacer(modifier = GlanceModifier.height(2.dp))
         Text(
             text = message,
             style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
+                color = ColorProvider(Color(0xFF8E99A8)),
                 fontSize = 11.sp
             ),
             maxLines = 1
@@ -507,40 +502,62 @@ private fun ErrorWideLayout(message: String) {
 }
 
 // ---------------------------------------------------------------------------
-// Helper Badges & Formatters
+// Helpers: Bitmap Ring & Pace Colors
 // ---------------------------------------------------------------------------
 
-@Composable
-private fun SurfaceBadge(
-    text: String,
-    bgColor: androidx.glance.unit.ColorProvider,
-    textColor: androidx.glance.unit.ColorProvider
-) {
-    Box(
-        modifier = GlanceModifier
-            .background(bgColor)
-            .cornerRadius(6.dp)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Text(
-            text = text,
-            style = TextStyle(
-                color = textColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp
-            )
-        )
+private fun renderGlanceRingBitmap(progress: Float, remainingRatio: Float): Bitmap {
+    val size = 96
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val strokeWidth = 10f
+    val pad = strokeWidth / 2f + 4f
+    val rect = RectF(pad, pad, size - pad, size - pad)
+
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+        color = 0xFF232B3D.toInt()
+    }
+    canvas.drawCircle(size / 2f, size / 2f, (size - strokeWidth) / 2f - 4f, trackPaint)
+
+    val progressColor = getDataProgressIntColor(remainingRatio)
+    val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+        strokeCap = Paint.Cap.ROUND
+        color = progressColor
+    }
+    if (progress > 0f) {
+        canvas.drawArc(rect, -90f, progress * 360f, false, progressPaint)
+    }
+    return bitmap
+}
+
+private fun getGlancePaceColor(pace: BurnPace): ColorProvider {
+    return when (pace) {
+        BurnPace.ON_TRACK, BurnPace.CONSERVATIVE -> ColorProvider(Color(0xFF00F5D4))
+        BurnPace.BURNING_FAST -> ColorProvider(Color(0xFFFACC15))
+        BurnPace.DEPLETED -> ColorProvider(Color(0xFFFF4D4D))
+        BurnPace.INSUFFICIENT_DATA -> ColorProvider(Color(0xFF94A3B8))
     }
 }
 
-@Composable
-private fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
-    val (label, bg, fg) = when (pace) {
-        BurnPace.BURNING_FAST -> Triple("🔥 Fast", GlanceTheme.colors.errorContainer, GlanceTheme.colors.onErrorContainer)
-        BurnPace.ON_TRACK -> Triple(if (isNoExpiry) "⚡ Steady" else "⚡ On Track", GlanceTheme.colors.primaryContainer, GlanceTheme.colors.onPrimaryContainer)
-        BurnPace.CONSERVATIVE -> Triple("🛡️ Safe", GlanceTheme.colors.secondaryContainer, GlanceTheme.colors.onSecondaryContainer)
-        BurnPace.DEPLETED -> Triple("⛔ Depleted", GlanceTheme.colors.error, GlanceTheme.colors.onError)
-        BurnPace.INSUFFICIENT_DATA -> Triple("⏳ Calibrating", GlanceTheme.colors.surface, GlanceTheme.colors.onSurfaceVariant)
+private fun getGlancePaceLabel(pace: BurnPace, isNoExpiry: Boolean): String {
+    return if (isNoExpiry) {
+        when (pace) {
+            BurnPace.ON_TRACK -> "Pace Normal"
+            BurnPace.CONSERVATIVE -> "Low Burn"
+            BurnPace.BURNING_FAST -> "Fast Burn"
+            BurnPace.DEPLETED -> "Data Depleted"
+            BurnPace.INSUFFICIENT_DATA -> "Calibrating"
+        }
+    } else {
+        when (pace) {
+            BurnPace.ON_TRACK -> "On Track"
+            BurnPace.CONSERVATIVE -> "Under Pace"
+            BurnPace.BURNING_FAST -> "Burning Fast"
+            BurnPace.DEPLETED -> "Depleted"
+            BurnPace.INSUFFICIENT_DATA -> "Calibrating"
+        }
     }
-    SurfaceBadge(text = label, bgColor = bg, textColor = fg)
 }

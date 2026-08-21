@@ -30,6 +30,19 @@ val TextMediumEmphasis = Color(0xFF8E99A8)   // Slate gray for labels & body (co
 val TextLowEmphasis = Color(0xFF64748B)      // Muted slate for captions & timestamps
 
 // ---------------------------------------------------------------------------
+// Light-Card Surface & Typography Tokens (For Widget Light Preview Cards)
+// ---------------------------------------------------------------------------
+val LightCardSurface = Color(0xFFFFFFFF)     // Crisp white surface for light widget cards
+val LightCardOutline = Color(0xFFE5EBF2)     // Light gray border
+val TextLightHigh = Color(0xFF10141E)        // Near-black text for light cards
+val TextLightMedium = Color(0xFF6B7280)      // Slate gray secondary text for light cards
+val TextLightLow = Color(0xFF9CA3AF)         // Muted gray captions for light cards
+val LightRingTrack = Color(0xFFE5EBF2)       // Light ring background track
+val LightLinearTrack = Color(0xFFE9EDF5)     // Light linear progress bar track
+val DarkRingTrack = Color(0xFF222938)        // Dark ring background track
+val DarkLinearTrack = Color(0xFF252D3D)      // Dark linear progress bar track
+
+// ---------------------------------------------------------------------------
 // Primary Brand & Interactive Accent (Teal / Electric Mint)
 // ---------------------------------------------------------------------------
 val MintPrimary = Color(0xFF00F5D4)          // Electric Mint accent for buttons, FAB, focus rings, sliders
@@ -74,14 +87,25 @@ val PaceCriticalContainer = Color(0xFF4A1515)// Deep red background
 val PaceCriticalText = Color(0xFFFFB4B4)     // Light red text
 
 // ---------------------------------------------------------------------------
-// Legacy Aliases for backwards compatibility
+// Dynamic Allowance Progression Color Mapping (Green -> Yellow -> Orange -> Red)
 // ---------------------------------------------------------------------------
-val SmartGreenPrimary = MintPrimary
-val SmartGreenDark = MintPrimaryContainer
-val SmartGreenLight = MintOnPrimaryContainer
-val PaceSafe = PaceOnTrack
-val PaceWarning = PaceCalibrating
-val BackgroundLight = DarkBackground
-val SurfaceLight = DarkSurface
-val TextPrimary = TextHighEmphasis
-val TextSecondary = TextMediumEmphasis
+fun getDataProgressColor(remainingRatio: Float): Color {
+    val ratio = remainingRatio.coerceIn(0f, 1f)
+    return when {
+        ratio > 0.50f -> MintPrimary          // Electric Mint / Green (#00F5D4)
+        ratio > 0.25f -> Color(0xFFFACC15)   // Vibrant Yellow (#FACC15)
+        ratio > 0.10f -> Color(0xFFFF9F43)   // Warning Orange (#FF9F43)
+        else -> Color(0xFFFF4D4D)            // Critical Red (#FF4D4D)
+    }
+}
+
+fun getDataProgressIntColor(remainingRatio: Float): Int {
+    val ratio = remainingRatio.coerceIn(0f, 1f)
+    return when {
+        ratio > 0.50f -> android.graphics.Color.parseColor("#00F5D4")
+        ratio > 0.25f -> android.graphics.Color.parseColor("#FACC15")
+        ratio > 0.10f -> android.graphics.Color.parseColor("#FF9F43")
+        else -> android.graphics.Color.parseColor("#FF4D4D")
+    }
+}
+

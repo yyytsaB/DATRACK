@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -51,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -88,8 +91,10 @@ import com.loadpredictor.presentation.theme.LoadPredictorTheme
 import com.loadpredictor.presentation.theme.MintOnPrimary
 import com.loadpredictor.presentation.theme.MintPrimary
 import com.loadpredictor.presentation.theme.MintPrimaryContainer
+import com.loadpredictor.presentation.theme.PaceCalibrating
 import com.loadpredictor.presentation.theme.PaceCalibratingContainer
 import com.loadpredictor.presentation.theme.PaceCalibratingText
+import com.loadpredictor.presentation.theme.PaceConservative
 import com.loadpredictor.presentation.theme.PaceConservativeContainer
 import com.loadpredictor.presentation.theme.PaceConservativeText
 import com.loadpredictor.presentation.theme.PaceCritical
@@ -241,6 +246,12 @@ fun MainScreenContent(
                 modifier = modifier
             )
         }
+        uiState.forecastResult is BurnForecastResult.NoActivePromo -> {
+            com.loadpredictor.presentation.common.NoActivePromoScreen(
+                onConfigureClick = onNavigateToPromos,
+                modifier = modifier
+            )
+        }
         else -> {
             DashboardView(
                 uiState = uiState,
@@ -267,32 +278,14 @@ fun DashboardView(
     ) {
         TopAppBar(
             title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(
-                                color = SurfaceLayer1,
-                                shape = RoundedCornerShape(10.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Equalizer,
-                            contentDescription = null,
-                            tint = MintPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Load Predictor",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.02).sp,
-                        color = TextHighEmphasis
-                    )
-                }
+                Text(
+                    text = "DATRACK",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    fontStyle = FontStyle.Italic,
+                    letterSpacing = 1.sp,
+                    color = TextHighEmphasis
+                )
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = DarkBackground,
@@ -303,23 +296,19 @@ fun DashboardView(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
-            // Notification Permission Opt-In Card
-            BurnAlertsOptInCard()
-
             when (val forecastResult = uiState.forecastResult) {
                 is BurnForecastResult.NoActivePromo -> {
                     NoActivePromoCard(onConfigureClick = onNavigateToPromos)
                 }
                 is BurnForecastResult.Success -> {
-                    LiveForecastHeroCard(
+                    LiveForecastHeroSection(
                         forecast = forecastResult.forecast,
                         dailyAvgBytes = uiState.dailyUsageBreakdown.let { list ->
                             if (list.isEmpty()) 0L else list.map { it.totalBytes }.average().toLong()
-                        },
-                        onNavigateToPromos = onNavigateToPromos
+                        }
                     )
 
                     // Daily Usage Breakdown Teaser Strip
@@ -338,195 +327,234 @@ fun DashboardView(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-fun LiveForecastHeroCard(
+fun LiveForecastHeroSection(
     forecast: BurnForecast,
-    dailyAvgBytes: Long,
-    onNavigateToPromos: () -> Unit
+    dailyAvgBytes: Long
 ) {
     val remainingRatio = (forecast.dataRemainingBytes.toFloat() / forecast.promo.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
     val dataPair = DataFormatter.formatDataPair(
         remainingBytes = forecast.dataRemainingBytes,
         totalAllowanceBytes = forecast.promo.totalAllowanceBytes
     )
+    val simSlotTitle = if (forecast.promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
+    val depletionHighlight = formatDepletionHeadline(forecast)
+    val promoExpiryHeadline = formatPromoExpiryHeadline(forecast)
 
-    Card(
+    val paceHighlightColor = when (forecast.pace) {
+        BurnPace.BURNING_FAST -> Color(0xFFFF9F43)
+        BurnPace.ON_TRACK -> MintPrimary
+        BurnPace.CONSERVATIVE -> PaceConservative
+        BurnPace.INSUFFICIENT_DATA -> PaceCalibrating
+        BurnPace.DEPLETED -> Color(0xFFFF5252)
+    }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
-        border = BorderStroke(1.dp, BorderHighlight)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+        // 1. Context Row: Promo name & sync status on Left, SIM chip on Right
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
         ) {
-            // Header row: Promo name + SIM badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = forecast.promo.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextHighEmphasis
-                    )
-                    Text(
-                        text = if (forecast.promo.isNoExpiry) "Non-Expiring Promo" else "Expiring Promo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMediumEmphasis
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MintPrimary
-                ) {
-                    Text(
-                        text = if (forecast.promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2",
-                        color = MintOnPrimary,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        fontWeight = FontWeight.Black
-                    )
-                }
-            }
-
-            // Radial Progress Ring (Pace Tinted)
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                RadialPaceRing(
-                    remainingRatio = remainingRatio,
-                    remainingFormatted = dataPair.remainingFormatted,
-                    totalAllowanceFormatted = dataPair.totalFormatted,
-                    pace = forecast.pace,
-                    size = 210.dp,
-                    strokeWidth = 14.dp
+            Column {
+                Text(
+                    text = "${forecast.promo.name} • $simSlotTitle",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF8E9AA8),
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Synced just now",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF5A6678),
+                    fontSize = 12.sp
                 )
             }
 
-            // Pace Pill (Semantic colors)
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
-            }
-
-            // 3 Stat Chips (Daily avg, Days left / Validity, At this pace)
-            DashboardStatChips(
-                forecast = forecast,
-                dailyAvgBytes = dailyAvgBytes
-            )
-
-            // Recessed Plain language advisory container
             Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceRecessed,
-                border = BorderStroke(1.dp, DarkOutlineVariant),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF142426),
+                border = BorderStroke(1.dp, Color(0xFF1B3D3B))
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .background(
-                                color = SurfaceLayer1,
-                                shape = CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MintPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = forecast.plainLanguageSummary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = TextHighEmphasis
+                            .size(6.dp)
+                            .background(Color(0xFF05D686), CircleShape)
                     )
-                }
-            }
-
-            // Footer action
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(
-                    onClick = onNavigateToPromos,
-                    shape = RoundedCornerShape(10.dp)
-                ) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Switch / Edit Promo →",
-                        color = MintPrimary,
-                        fontWeight = FontWeight.Bold
+                        text = simSlotTitle,
+                        color = Color(0xFF05D686),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
                     )
                 }
             }
         }
+
+        // 2. Headline Prediction Section
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "At current pace, you'll run out",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                fontSize = 22.sp
+            )
+            Text(
+                text = depletionHighlight,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = paceHighlightColor,
+                fontSize = 22.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = promoExpiryHeadline,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF8E9AA8),
+                fontSize = 13.sp
+            )
+        }
+
+        // 3. Pace Status Badge Pill
+        PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
+
+        // 4. Hero Radial Ring Gauge
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            RadialPaceRing(
+                remainingRatio = remainingRatio,
+                remainingFormatted = dataPair.remainingFormatted,
+                totalAllowanceFormatted = dataPair.totalFormatted,
+                pace = forecast.pace,
+                size = 230.dp,
+                strokeWidth = 15.dp
+            )
+        }
+
+        // 5. 3 Stat Chips (Daily avg, Days left, At this pace)
+        DashboardStatChips(
+            forecast = forecast,
+            dailyAvgBytes = dailyAvgBytes
+        )
     }
 }
 
 @Composable
 fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
-    val (bgColor, textColor, label) = when (pace) {
-        BurnPace.BURNING_FAST -> Triple(
-            PaceCriticalContainer,
-            PaceCriticalText,
-            "🔥 Burning Fast"
+    val (bgColor, dotColor, textColor, label) = when (pace) {
+        BurnPace.BURNING_FAST -> Quadruple(
+            Color(0xFF2E2016),
+            Color(0xFFFF9F43),
+            Color(0xFFFF9F43),
+            if (isNoExpiry) "Burning Fast" else "Cutting It Close"
         )
-        BurnPace.ON_TRACK -> Triple(
-            PaceOnTrackContainer,
-            PaceOnTrackText,
-            if (isNoExpiry) "⚡ Steady Pace" else "⚡ Pace On Track"
+        BurnPace.ON_TRACK -> Quadruple(
+            Color(0xFF0C2B1D),
+            Color(0xFF00F5D4),
+            Color(0xFF00F5D4),
+            if (isNoExpiry) "Steady Pace" else "Safe Pace"
         )
-        BurnPace.CONSERVATIVE -> Triple(
-            PaceConservativeContainer,
-            PaceConservativeText,
-            if (isNoExpiry) "🛡️ Light Pace" else "🛡️ Conservative Pace"
+        BurnPace.CONSERVATIVE -> Quadruple(
+            Color(0xFF0F2438),
+            Color(0xFF38BDF8),
+            Color(0xFF38BDF8),
+            if (isNoExpiry) "Light Pace" else "Conservative Pace"
         )
-        BurnPace.DEPLETED -> Triple(
-            PaceCriticalContainer,
-            PaceCriticalText,
-            "⛔ Data Depleted"
+        BurnPace.DEPLETED -> Quadruple(
+            Color(0xFF2E1414),
+            Color(0xFFFF5252),
+            Color(0xFFFF5252),
+            "Data Depleted"
         )
-        BurnPace.INSUFFICIENT_DATA -> Triple(
-            PaceCalibratingContainer,
-            PaceCalibratingText,
-            "⏳ Calibrating"
+        BurnPace.INSUFFICIENT_DATA -> Quadruple(
+            Color(0xFF2E2414),
+            Color(0xFFFBBF24),
+            Color(0xFFFBBF24),
+            "Calibrating"
         )
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = bgColor
     ) {
-        Text(
-            text = label,
-            color = textColor,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(dotColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                color = textColor,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+private fun formatDepletionHeadline(forecast: BurnForecast): String {
+    val now = System.currentTimeMillis()
+    val est = forecast.estimatedDepletionTimestamp
+    return when {
+        forecast.pace == BurnPace.DEPLETED -> "Data already depleted"
+        forecast.pace == BurnPace.INSUFFICIENT_DATA -> "Calculating burn pace..."
+        est == null -> "Will last until promo ends"
+        est <= now -> "Depleting very soon"
+        else -> {
+            val daysDiff = ((est - now) / (1000 * 60 * 60 * 24)).toInt()
+            val sdfDayTime = java.text.SimpleDateFormat("EEEE 'at' h:mm a", java.util.Locale.US)
+            val sdfDateTime = java.text.SimpleDateFormat("MMM d 'at' h:mm a", java.util.Locale.US)
+            if (daysDiff < 7) {
+                sdfDayTime.format(java.util.Date(est))
+            } else {
+                sdfDateTime.format(java.util.Date(est))
+            }
+        }
+    }
+}
+
+private fun formatPromoExpiryHeadline(forecast: BurnForecast): String {
+    val promo = forecast.promo
+    val now = System.currentTimeMillis()
+    return if (promo.isNoExpiry || promo.expirationTimestamp == null) {
+        "No expiration • Data cap only"
+    } else {
+        val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+        val expDateStr = sdf.format(java.util.Date(promo.expirationTimestamp))
+        val daysLeft = ((promo.expirationTimestamp - now).coerceAtLeast(0L) / (1000 * 60 * 60 * 24)).toInt()
+        val daysText = if (daysLeft == 0) "< 1 day" else "$daysLeft ${if (daysLeft == 1) "day" else "days"}"
+        "Promo ends $expDateStr • $daysText left"
     }
 }
 

@@ -25,15 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loadpredictor.domain.model.UsageBucket
-import com.loadpredictor.presentation.theme.BorderHighlight
 import com.loadpredictor.presentation.theme.MintPrimary
-import com.loadpredictor.presentation.theme.SurfaceLayer1
-import com.loadpredictor.presentation.theme.SurfaceLayer2
-import com.loadpredictor.presentation.theme.TextHighEmphasis
-import com.loadpredictor.presentation.theme.TextMediumEmphasis
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * Compact mini daily bar strip teaser on Dashboard with tap-through to History tab.
+ * Daily usage bar strip teaser matching preview.webp.
  */
 @Composable
 fun DailyUsageTeaserCard(
@@ -41,73 +39,91 @@ fun DailyUsageTeaserCard(
     onViewHistoryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onViewHistoryClick),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
-        border = BorderStroke(1.dp, BorderHighlight)
+    val dateRangeText = if (buckets.isNotEmpty()) {
+        val sdf = SimpleDateFormat("MMM d", Locale.US)
+        val firstDate = sdf.format(Date(buckets.first().startTimestamp))
+        val lastDate = sdf.format(Date(buckets.last().startTimestamp))
+        "$firstDate – $lastDate"
+    } else {
+        "Recent 14 Days"
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Daily Usage",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = dateRangeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6B7280),
+                fontSize = 12.sp
+            )
+        }
+
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .clickable(onClick = onViewHistoryClick),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF141824)),
+            border = BorderStroke(1.dp, Color(0xFF222B3D))
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Daily Usage",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextHighEmphasis
-                )
-                Text(
-                    text = "View History →",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MintPrimary
-                )
-            }
-
-            // Mini Bar Strip
-            val maxBytes = (buckets.maxOfOrNull { it.totalBytes } ?: 1L).coerceAtLeast(1024L * 1024L).toFloat()
-            val visibleBuckets = buckets.takeLast(14)
-
-            Canvas(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
             ) {
-                if (visibleBuckets.isEmpty()) return@Canvas
+                // Mini Bar Strip
+                val maxBytes = (buckets.maxOfOrNull { it.totalBytes } ?: 1L).coerceAtLeast(1024L * 1024L).toFloat()
+                val visibleBuckets = buckets.takeLast(14)
 
-                val count = visibleBuckets.size
-                val spacingPx = 6.dp.toPx()
-                val totalSpacing = spacingPx * (count - 1).coerceAtLeast(0)
-                val barWidth = ((size.width - totalSpacing) / count).coerceIn(6.dp.toPx(), 20.dp.toPx())
-                val cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                ) {
+                    if (visibleBuckets.isEmpty()) return@Canvas
 
-                visibleBuckets.forEachIndexed { index, bucket ->
-                    val x = index * (barWidth + spacingPx)
-                    val ratio = (bucket.totalBytes.toFloat() / maxBytes).coerceIn(0.08f, 1f)
-                    val barHeight = size.height * ratio
-                    val y = size.height - barHeight
+                    val count = visibleBuckets.size
+                    val spacingPx = 6.dp.toPx()
+                    val totalSpacing = spacingPx * (count - 1).coerceAtLeast(0)
+                    val barWidth = ((size.width - totalSpacing) / count).coerceIn(6.dp.toPx(), 20.dp.toPx())
+                    val cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
 
-                    val isToday = index == visibleBuckets.lastIndex
-                    val barColor = if (isToday) MintPrimary else SurfaceLayer2
+                    visibleBuckets.forEachIndexed { index, bucket ->
+                        val x = index * (barWidth + spacingPx)
+                        val ratio = (bucket.totalBytes.toFloat() / maxBytes).coerceIn(0.12f, 1f)
+                        val barHeight = size.height * ratio
+                        val y = size.height - barHeight
 
-                    drawRoundRect(
-                        color = barColor,
-                        topLeft = Offset(x, y),
-                        size = Size(barWidth, barHeight),
-                        cornerRadius = cornerRadius
-                    )
+                        val isToday = index == visibleBuckets.lastIndex
+                        val barColor = if (isToday) {
+                            MintPrimary
+                        } else {
+                            Color(0xFF233544)
+                        }
+
+                        drawRoundRect(
+                            color = barColor,
+                            topLeft = Offset(x, y),
+                            size = Size(barWidth, barHeight),
+                            cornerRadius = cornerRadius
+                        )
+                    }
                 }
             }
         }
     }
 }
+

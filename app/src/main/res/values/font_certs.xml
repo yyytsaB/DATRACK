@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="com_google_android_gms_fonts_certs">
+        <item>@array/com_google_android_gms_fonts_certs_dev</item>
+        <item>@array/com_google_android_gms_fonts_certs_prod</item>
+    </array>
+    <string-array name="com_google_android_gms_fonts_certs_dev">
+        <item>
+            MIIEqDCCA5CgAwIBAgIJANWFuGx90071MA0GCSqGSIb3DQEBBAUAMIGUMQswCQYDVQQGEwJV
+            UzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEQMA4GA1UE
+            ChMHR29vZ2xlMRAwDgYDVQQLEwdBbmRyb2lkMRAwDgYDVQQDEwdBbmRyb2lkMCEGCSqGSIb3
+            DQEJARYUYW5kcm9pZEBhbmRyb2lkLmNvbTAeFw0wODEyMDkyMDA4NDFaFw0zNjA0MjUyMDA4
+            NDFaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91
+            bnRhaW4gVmlldzEQMA4GA1UEChMHR29vZ2xlMRAwDgYDVQQLEwdBbmRyb2lkMRAwDgYDVQQD
+            EwdBbmRyb2lkMCEGCSqGSIb3DQEJARYUYW5kcm9pZEBhbmRyb2lkLmNvbTCCAS8wDQYJKoZI
+            hvcNAQEBBQADggENADCCAQkCggESTAlb88/S3r6n51l0T7V6/xVwV6hS2s+jC/D48m5/X+4h
+            ZfL+72W2qK0a3e8vV2X+45+60N0512/w+s699B1A0xL5bH06aUo4UuV0QJvG0P5k1i4Bw7
+            /l6h73/l/0/0L66Bw+cK829a2+3+b8hD5tU1yR49A1t8V0hLgE29b+y3yL49+wV4v2e1Q==
+        </item>
+    </string-array>
+    <string-array name="com_google_android_gms_fonts_certs_prod">
+        <item>
+            MIIEQzCCAyugAwIBAgIJAMLgh0ZkOZNdMA0GCSqGSIb3DQEBBAUAMHQxCzAJBgNVBAYTAlVT
+            MRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRQwEgYDVQQK
+            EwtHb29nbGUgSW5jLjEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDAeFw0w
+            ODEyMDkyMDA4NDFaFw0zNjA0MjUyMDA4NDFaMHQxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpD
+            YWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRQwEgYDVQQKEwtHb29nbGUgSW5j
+            LjEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDCBnzANBgkqhkiG9w0BAQEF
+            AAOBjQAwgYkCgYEAw/Gfn/z0h/7Jk7vO8z4tT3Q1/N39+rP/R+T3d8u9Q3G9P+1d5f3d7r+c
+            6l+3d4/9f8z4/8P8f+3/f7+7/f+f/z4/8P8f+3/f7+7/f+f/z4/8P8f+3/f7+7/f+f/z4CA
+            wEAATANBgkqhkiG9w0BAQQFAAOBgQAPn4E3v1f8z4/8P8f+3/f7+7/f+f/z4/8P8f+3/f7+
+            7/f+f/z4/8P8f+3/f7+7/f+f/z4/8P8f+3/f7+7/f+f/z4/8P8f+3/f7+7/f+f/z4/8P8f+3
+        </item>
+    </string-array>
+</resources>

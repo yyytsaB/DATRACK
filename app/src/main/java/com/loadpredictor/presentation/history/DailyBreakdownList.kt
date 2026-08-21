@@ -1,6 +1,5 @@
 package com.loadpredictor.presentation.history
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,10 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loadpredictor.domain.model.UsageBucket
-import com.loadpredictor.presentation.theme.BorderHighlight
 import com.loadpredictor.presentation.theme.MintPrimary
-import com.loadpredictor.presentation.theme.SurfaceLayer1
-import com.loadpredictor.presentation.theme.SurfaceRecessed
 import com.loadpredictor.presentation.theme.TextHighEmphasis
 import com.loadpredictor.presentation.theme.TextLowEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
@@ -40,7 +34,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Grouped breakdown list displaying day-by-day consumption in reverse chronological order.
+ * Frameless daily consumption list displaying day-by-day records in reverse chronological order.
+ * No outer card container, no per-row borders. Separated by subtle hairline dividers.
  */
 @Composable
 fun DailyBreakdownList(
@@ -49,58 +44,58 @@ fun DailyBreakdownList(
     onSelectBucketTimestamp: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
-        border = BorderStroke(1.dp, BorderHighlight)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Plain text section header (no card/frame)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            Text(
+                text = "Daily Breakdown",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextHighEmphasis
+            )
+            Text(
+                text = "${buckets.size} ${if (buckets.size == 1) "day" else "days"}",
+                fontSize = 12.sp,
+                color = TextMediumEmphasis
+            )
+        }
+
+        if (buckets.isEmpty()) {
+            Text(
+                text = "No usage records available for this period.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextMediumEmphasis,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+        } else {
+            val maxBytes = buckets.maxOf { it.totalBytes }.coerceAtLeast(1024L * 1024L)
+            val reversedBuckets = buckets.reversed() // Reverse chronological order (newest first)
+
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Text(
-                    text = "Daily Breakdown",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextHighEmphasis
-                )
-                Text(
-                    text = "${buckets.size} ${if (buckets.size == 1) "day" else "days"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMediumEmphasis
-                )
-            }
+                reversedBuckets.forEachIndexed { index, bucket ->
+                    val isSelected = (bucket.startTimestamp == (selectedBucketTimestamp ?: buckets.lastOrNull()?.startTimestamp))
+                    DailyBreakdownRow(
+                        bucket = bucket,
+                        maxBytes = maxBytes,
+                        isSelected = isSelected,
+                        onClick = { onSelectBucketTimestamp(bucket.startTimestamp) }
+                    )
 
-            if (buckets.isEmpty()) {
-                Text(
-                    text = "No usage records available for this period.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextMediumEmphasis,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-            } else {
-                val maxBytes = buckets.maxOf { it.totalBytes }.coerceAtLeast(1024L * 1024L)
-                val reversedBuckets = buckets.reversed() // Reverse chronological order (newest first)
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    reversedBuckets.forEach { bucket ->
-                        val isSelected = (bucket.startTimestamp == (selectedBucketTimestamp ?: buckets.lastOrNull()?.startTimestamp))
-                        DailyBreakdownRow(
-                            bucket = bucket,
-                            maxBytes = maxBytes,
-                            isSelected = isSelected,
-                            onClick = { onSelectBucketTimestamp(bucket.startTimestamp) }
+                    if (index < reversedBuckets.lastIndex) {
+                        HorizontalDivider(
+                            color = Color(0xFF181F2C),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
                 }
@@ -116,67 +111,59 @@ private fun DailyBreakdownRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.02f, 1f)
+    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
 
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) SurfaceRecessed else SurfaceLayer1,
-        border = if (isSelected) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.5f)) else BorderStroke(1.dp, Color(0xFF222B3D)),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Date Badge
-            Column(modifier = Modifier.width(80.dp)) {
-                Text(
-                    text = formatDateMonthDay(bucket.startTimestamp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) MintPrimary else TextHighEmphasis
-                )
-                Text(
-                    text = formatDayOfWeek(bucket.startTimestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextLowEmphasis
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Mini Horizontal Proportion Bar
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF252E3E))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isSelected) MintPrimary else Color(0xFF4B5563))
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Formatted Bytes Amount
+        // Date (Left)
+        Column(modifier = Modifier.width(68.dp)) {
             Text(
-                text = DataFormatter.formatBytes(bucket.totalBytes),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
+                text = formatDateMonthDay(bucket.startTimestamp),
+                fontSize = 13.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) MintPrimary else TextHighEmphasis
             )
+            Text(
+                text = formatDayOfWeek(bucket.startTimestamp),
+                fontSize = 11.sp,
+                color = TextLowEmphasis
+            )
         }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Mini Horizontal Proportion Bar (Middle)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFF1E2636))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (isSelected) MintPrimary else Color(0xFF2DD4BF))
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Formatted Bytes Amount (Right)
+        Text(
+            text = DataFormatter.formatBytes(bucket.totalBytes),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isSelected) MintPrimary else TextHighEmphasis
+        )
     }
 }
 
