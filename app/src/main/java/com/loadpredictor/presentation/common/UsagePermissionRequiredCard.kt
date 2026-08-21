@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,32 +62,13 @@ fun UsagePermissionRequiredCard(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Datrack",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        text = "DATRACK",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        letterSpacing = 1.sp,
                         color = TextHighEmphasis
                     )
-                },
-                actions = {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFF1B212D),
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .size(36.dp)
-                    ) {
-                        IconButton(
-                            onClick = { /* Overflow menu */ },
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = null,
-                                tint = TextMediumEmphasis,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkBackground,
