@@ -49,4 +49,7 @@ abstract class PromoDao {
         deactivateAllPromos()
         activatePromoById(id)
     }
+
+    @Query("UPDATE promos SET last_active_burn_rate = :burnRate, last_sync_data_used_bytes = :dataUsedBytes, last_sync_timestamp = :syncTimestamp WHERE id = :promoId")
+    abstract suspend fun updateSyncState(promoId: Long, burnRate: Double?, dataUsedBytes: Long, syncTimestamp: Long): Int
 }

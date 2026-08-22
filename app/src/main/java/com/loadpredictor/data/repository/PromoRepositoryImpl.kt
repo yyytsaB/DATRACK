@@ -46,4 +46,13 @@ class PromoRepositoryImpl(
     override suspend fun setActivePromo(id: Long) {
         promoDao.setActivePromo(id)
     }
+
+    override suspend fun updateSyncState(
+        promoId: Long,
+        burnRate: Double?,
+        dataUsedBytes: Long,
+        syncTimestamp: Long
+    ) {
+        promoDao.updateSyncState(promoId, burnRate, dataUsedBytes, syncTimestamp)
+    }
 }

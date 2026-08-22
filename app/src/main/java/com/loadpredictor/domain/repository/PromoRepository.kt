@@ -47,4 +47,9 @@ interface PromoRepository {
      * Sets the active promo context, deactivating any previously active promo.
      */
     suspend fun setActivePromo(id: Long)
+
+    /**
+     * Atomically updates the persisted active burn rate and sync metadata for a promo.
+     */
+    suspend fun updateSyncState(promoId: Long, burnRate: Double?, dataUsedBytes: Long, syncTimestamp: Long)
 }

@@ -37,7 +37,16 @@ data class PromoEntity(
     val simSlot: SimSlot = SimSlot.SIM_1,
 
     @ColumnInfo(name = "is_active")
-    val isActive: Boolean = false
+    val isActive: Boolean = false,
+
+    @ColumnInfo(name = "last_active_burn_rate", defaultValue = "NULL")
+    val lastActiveBurnRate: Double? = null,
+
+    @ColumnInfo(name = "last_sync_data_used_bytes", defaultValue = "0")
+    val lastSyncDataUsedBytes: Long = 0L,
+
+    @ColumnInfo(name = "last_sync_timestamp", defaultValue = "0")
+    val lastSyncTimestamp: Long = 0L
 ) {
     fun toDomain(): Promo {
         return Promo(
@@ -48,7 +57,10 @@ data class PromoEntity(
             expirationTimestamp = expirationTimestamp,
             initialUsageOffsetBytes = initialUsageOffsetBytes,
             simSlot = simSlot,
-            isActive = isActive
+            isActive = isActive,
+            lastActiveBurnRate = lastActiveBurnRate,
+            lastSyncDataUsedBytes = lastSyncDataUsedBytes,
+            lastSyncTimestamp = lastSyncTimestamp
         )
     }
 }
@@ -65,6 +77,9 @@ fun Promo.toEntity(): PromoEntity {
         expirationTimestamp = expirationTimestamp,
         initialUsageOffsetBytes = initialUsageOffsetBytes,
         simSlot = simSlot,
-        isActive = isActive
+        isActive = isActive,
+        lastActiveBurnRate = lastActiveBurnRate,
+        lastSyncDataUsedBytes = lastSyncDataUsedBytes,
+        lastSyncTimestamp = lastSyncTimestamp
     )
 }

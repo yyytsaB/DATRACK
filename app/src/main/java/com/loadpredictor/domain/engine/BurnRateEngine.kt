@@ -80,16 +80,32 @@ class BurnRateEngine {
             maxOf(0L, exp - currentTime)
         }
 
-        // Active device burn rate strictly from live tracked consumption:
-        val burnRateBytesPerHour: Double = if (elapsedTimeMs > 0L) {
-            (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
-        } else {
-            0.0
+        // Check calibration status: must clear BOTH the 1-hour time window AND 10 MB volume threshold
+        val isCalibrated = (elapsedTimeMs >= STABILIZATION_WINDOW_MS) &&
+                (measuredLiveUsageBytes >= MIN_MEANINGFUL_USAGE_BYTES)
+
+        // Detect if fresh mobile data traffic occurred since last recorded sync
+        val hasNewActiveUsage = (measuredLiveUsageBytes > promo.lastSyncDataUsedBytes)
+
+        // Effective burn rate: use fresh live velocity on active traffic; freeze to last known active rate when idle
+        val burnRateBytesPerHour: Double = when {
+            hasNewActiveUsage -> {
+                if (elapsedTimeMs > 0L) {
+                    (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
+                } else {
+                    0.0
+                }
+            }
+            promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0 -> {
+                promo.lastActiveBurnRate
+            }
+            elapsedTimeMs > 0L -> {
+                (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
+            }
+            else -> 0.0
         }
 
-        // Strict AND combination: must clear BOTH the time window AND the 10 MB volume threshold
-        val hasSufficientData = (elapsedTimeMs >= STABILIZATION_WINDOW_MS) &&
-                (measuredLiveUsageBytes >= MIN_MEANINGFUL_USAGE_BYTES)
+        val hasSufficientData = isCalibrated || (promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0)
 
         val estimatedDepletionTimestamp: Long?
         val burnStatusIndex: Double?

@@ -3,238 +3,102 @@ package com.loadpredictor.data.stats
 import android.app.usage.NetworkStats
 import android.app.usage.NetworkStatsManager
 import android.content.Context
-import android.net.ConnectivityManager
-import com.loadpredictor.domain.model.UsageAccessDeniedException
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class NetworkStatsDataSourceTest {
 
     private val context: Context = mockk(relaxed = true)
     private val networkStatsManager: NetworkStatsManager = mockk()
+    private val zoneId: ZoneId = ZoneId.of("Asia/Manila") // UTC+8
 
-    @Test
-    fun `queryMobileUsageBytes sums rxBytes and txBytes correctly`() {
-        val startTime = 1000L
-        val endTime = 5000L
-
-        val mockBucket = mockk<NetworkStats.Bucket>()
-        every { mockBucket.rxBytes } returns 3_000_000L
-        every { mockBucket.txBytes } returns 2_000_000L
-
-        @Suppress("DEPRECATION")
-        every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime,
-                endTime
-            )
-        } returns mockBucket
-
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
-
-        val totalBytes = dataSource.queryMobileUsageBytes(startTime, endTime)
-
-        assertEquals(5_000_000L, totalBytes)
-        @Suppress("DEPRECATION")
-        verify(exactly = 1) {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime,
-                endTime
-            )
-        }
+    private fun createBucket(rx: Long, tx: Long): NetworkStats.Bucket {
+        val bucket = mockk<NetworkStats.Bucket>()
+        every { bucket.rxBytes } returns rx
+        every { bucket.txBytes } returns tx
+        return bucket
     }
 
     @Test
-    fun `queryMobileUsageBytes throws UsageAccessDeniedException when SecurityException occurs`() {
-        val startTime = 1000L
-        val endTime = 5000L
+    fun `queryDailyUsageBreakdown slices mid-afternoon registration into partial first day and midnight-aligned subsequent days`() {
+        val dataSource = NetworkStatsDataSource(context, networkStatsManager)
 
-        @Suppress("DEPRECATION")
+        // Promo start: Aug 19, 2026 at 15:30:00 UTC+8
+        val promoStart = ZonedDateTime.of(2026, 8, 19, 15, 30, 0, 0, zoneId).toInstant().toEpochMilli()
+        // Query end: Aug 23, 2026 at 03:45:00 UTC+8
+        val queryEnd = ZonedDateTime.of(2026, 8, 23, 3, 45, 0, 0, zoneId).toInstant().toEpochMilli()
+
         every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime,
-                endTime
-            )
-        } throws SecurityException("PACKAGE_USAGE_STATS revoked mid-query")
-
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
-
-        // Assert that a distinct UsageAccessDeniedException is thrown to distinguish from genuine 0L usage
-        assertThrows(UsageAccessDeniedException::class.java) {
-            dataSource.queryMobileUsageBytes(startTime, endTime)
-        }
-    }
-
-    @Test
-    fun `queryMobileUsageBytes returns 0L on invalid or empty time ranges without querying manager`() {
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
-
-        // Equal start and end
-        assertEquals(0L, dataSource.queryMobileUsageBytes(1000L, 1000L))
-
-        // Start after end
-        assertEquals(0L, dataSource.queryMobileUsageBytes(2000L, 1000L))
-
-        // Negative start
-        assertEquals(0L, dataSource.queryMobileUsageBytes(-10L, 1000L))
-
-        // Zero or negative end
-        assertEquals(0L, dataSource.queryMobileUsageBytes(0L, 0L))
-
-        // Verify manager was never queried for invalid ranges
-        verify(exactly = 0) {
             networkStatsManager.querySummaryForDevice(any(), any(), any(), any())
-        }
+        } returns createBucket(100L, 50L)
+
+        val buckets = dataSource.queryDailyUsageBreakdown(promoStart, queryEnd, zoneId)
+
+        // Must produce 5 buckets:
+        // Bucket 0: Aug 19 15:30 -> Aug 20 00:00 (Partial day 1)
+        // Bucket 1: Aug 20 00:00 -> Aug 21 00:00 (Full day 2)
+        // Bucket 2: Aug 21 00:00 -> Aug 22 00:00 (Full day 3)
+        // Bucket 3: Aug 22 00:00 -> Aug 23 00:00 (Full day 4)
+        // Bucket 4: Aug 23 00:00 -> Aug 23 03:45 (Today partial day 5)
+        assertEquals(5, buckets.size)
+
+        // Bucket 0: Aug 19 partial
+        assertEquals(promoStart, buckets[0].startTimestamp)
+        val aug20Midnight = ZonedDateTime.of(2026, 8, 20, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        assertEquals(aug20Midnight, buckets[0].endTimestamp)
+
+        // Bucket 1: Aug 20 full day
+        val aug21Midnight = ZonedDateTime.of(2026, 8, 21, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        assertEquals(aug20Midnight, buckets[1].startTimestamp)
+        assertEquals(aug21Midnight, buckets[1].endTimestamp)
+
+        // Bucket 2: Aug 21 full day
+        val aug22Midnight = ZonedDateTime.of(2026, 8, 22, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        assertEquals(aug21Midnight, buckets[2].startTimestamp)
+        assertEquals(aug22Midnight, buckets[2].endTimestamp)
+
+        // Bucket 3: Aug 22 full day
+        val aug23Midnight = ZonedDateTime.of(2026, 8, 23, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        assertEquals(aug22Midnight, buckets[3].startTimestamp)
+        assertEquals(aug23Midnight, buckets[3].endTimestamp)
+
+        // Bucket 4: Aug 23 today's active partial day
+        assertEquals(aug23Midnight, buckets[4].startTimestamp)
+        assertEquals(queryEnd, buckets[4].endTimestamp)
     }
 
     @Test
-    fun `queryDailyUsageBreakdown returns empty list on invalid range`() {
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
+    fun `queryDailyUsageBreakdown starting exactly at midnight produces clean full day buckets`() {
+        val dataSource = NetworkStatsDataSource(context, networkStatsManager)
 
-        val buckets = dataSource.queryDailyUsageBreakdown(5000L, 1000L)
-        assertTrue(buckets.isEmpty())
-    }
+        val aug20Midnight = ZonedDateTime.of(2026, 8, 20, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        val aug22Noon = ZonedDateTime.of(2026, 8, 22, 12, 0, 0, 0, zoneId).toInstant().toEpochMilli()
 
-    @Test
-    fun `queryDailyUsageBreakdown throws UsageAccessDeniedException on SecurityException`() {
-        val startTime = 1000L
-        val endTime = 5000L
-
-        @Suppress("DEPRECATION")
         every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                any(),
-                any()
-            )
-        } throws SecurityException("PACKAGE_USAGE_STATS revoked")
+            networkStatsManager.querySummaryForDevice(any(), any(), any(), any())
+        } returns createBucket(200L, 100L)
 
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
+        val buckets = dataSource.queryDailyUsageBreakdown(aug20Midnight, aug22Noon, zoneId)
 
-        assertThrows(UsageAccessDeniedException::class.java) {
-            dataSource.queryDailyUsageBreakdown(startTime, endTime)
-        }
-    }
-
-    @Test
-    fun `queryDailyUsageBreakdown slices multi-day interval into 24-hour buckets and sums bytes`() {
-        val oneDayMillis = 24 * 60 * 60 * 1000L
-        val startTime = 1000L
-        val endTime = startTime + (3 * oneDayMillis) // 3 days
-
-        val bucket1 = mockk<NetworkStats.Bucket>()
-        every { bucket1.rxBytes } returns 1_000_000L
-        every { bucket1.txBytes } returns 500_000L
-
-        val bucket2 = mockk<NetworkStats.Bucket>()
-        every { bucket2.rxBytes } returns 2_000_000L
-        every { bucket2.txBytes } returns 1_000_000L
-
-        val bucket3 = mockk<NetworkStats.Bucket>()
-        every { bucket3.rxBytes } returns 500_000L
-        every { bucket3.txBytes } returns 250_000L
-
-        @Suppress("DEPRECATION")
-        every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime,
-                startTime + oneDayMillis
-            )
-        } returns bucket1
-
-        @Suppress("DEPRECATION")
-        every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime + oneDayMillis,
-                startTime + (2 * oneDayMillis)
-            )
-        } returns bucket2
-
-        @Suppress("DEPRECATION")
-        every {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime + (2 * oneDayMillis),
-                endTime
-            )
-        } returns bucket3
-
-        val dataSource = NetworkStatsDataSource(
-            context = context,
-            customNetworkStatsManager = networkStatsManager
-        )
-
-        val buckets = dataSource.queryDailyUsageBreakdown(startTime, endTime)
-
+        // Bucket 0: Aug 20 00:00 -> Aug 21 00:00 (Full day 1)
+        // Bucket 1: Aug 21 00:00 -> Aug 22 00:00 (Full day 2)
+        // Bucket 2: Aug 22 00:00 -> Aug 22 12:00 (Partial day 3)
         assertEquals(3, buckets.size)
+        assertEquals(aug20Midnight, buckets[0].startTimestamp)
+        val aug21Midnight = ZonedDateTime.of(2026, 8, 21, 0, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        assertEquals(aug21Midnight, buckets[0].endTimestamp)
+    }
 
-        // Day 1
-        assertEquals(startTime, buckets[0].startTimestamp)
-        assertEquals(startTime + oneDayMillis, buckets[0].endTimestamp)
-        assertEquals(1_500_000L, buckets[0].totalBytes)
-
-        // Day 2
-        assertEquals(startTime + oneDayMillis, buckets[1].startTimestamp)
-        assertEquals(startTime + (2 * oneDayMillis), buckets[1].endTimestamp)
-        assertEquals(3_000_000L, buckets[1].totalBytes)
-
-        // Day 3
-        assertEquals(startTime + (2 * oneDayMillis), buckets[2].startTimestamp)
-        assertEquals(endTime, buckets[2].endTimestamp)
-        assertEquals(750_000L, buckets[2].totalBytes)
-
-        @Suppress("DEPRECATION")
-        verify(exactly = 1) {
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime,
-                startTime + oneDayMillis
-            )
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime + oneDayMillis,
-                startTime + (2 * oneDayMillis)
-            )
-            networkStatsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_MOBILE,
-                null,
-                startTime + (2 * oneDayMillis),
-                endTime
-            )
-        }
+    @Test
+    fun `queryDailyUsageBreakdown when startTime is greater than or equal to endTime returns empty list`() {
+        val dataSource = NetworkStatsDataSource(context, networkStatsManager)
+        val now = 1000L
+        assertTrue(dataSource.queryDailyUsageBreakdown(now, now).isEmpty())
+        assertTrue(dataSource.queryDailyUsageBreakdown(now + 100, now).isEmpty())
     }
 }

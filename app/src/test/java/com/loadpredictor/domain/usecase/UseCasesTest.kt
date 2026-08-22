@@ -70,6 +70,26 @@ class UseCasesTest {
             activePromoFlow.value = promos.find { it.id == id }
             allPromosFlow.value = promos.toList()
         }
+
+        override suspend fun updateSyncState(
+            promoId: Long,
+            burnRate: Double?,
+            dataUsedBytes: Long,
+            syncTimestamp: Long
+        ) {
+            val idx = promos.indexOfFirst { it.id == promoId }
+            if (idx != -1) {
+                promos[idx] = promos[idx].copy(
+                    lastActiveBurnRate = burnRate,
+                    lastSyncDataUsedBytes = dataUsedBytes,
+                    lastSyncTimestamp = syncTimestamp
+                )
+                allPromosFlow.value = promos.toList()
+                if (activePromoFlow.value?.id == promoId) {
+                    activePromoFlow.value = promos[idx]
+                }
+            }
+        }
     }
 
     private class FakeUsageRepository(var permissionGranted: Boolean = false) : UsageRepository {

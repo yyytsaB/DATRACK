@@ -37,6 +37,16 @@ class GetActiveBurnForecastUseCase(
                 dataUsedBytesRaw = usedBytes,
                 currentTime = now
             )
+            val isCalibrated = (now - activePromo.startTimestamp >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
+                    (usedBytes >= BurnRateEngine.MIN_MEANINGFUL_USAGE_BYTES)
+            if (isCalibrated && (usedBytes > activePromo.lastSyncDataUsedBytes || activePromo.lastActiveBurnRate == null)) {
+                promoRepository.updateSyncState(
+                    promoId = activePromo.id,
+                    burnRate = forecast.burnRateBytesPerHour,
+                    dataUsedBytes = usedBytes,
+                    syncTimestamp = now
+                )
+            }
             BurnForecastResult.Success(forecast)
         } catch (throwable: Throwable) {
             if (throwable is UsageAccessDeniedException || throwable.cause is UsageAccessDeniedException) {

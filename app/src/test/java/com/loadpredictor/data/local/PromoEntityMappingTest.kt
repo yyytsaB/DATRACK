@@ -20,7 +20,10 @@ class PromoEntityMappingTest {
             expirationTimestamp = 1800000000000L,
             initialUsageOffsetBytes = 1024L * 1024L * 250L,
             simSlot = SimSlot.SIM_2,
-            isActive = true
+            isActive = true,
+            lastActiveBurnRate = 1234567.89,
+            lastSyncDataUsedBytes = 50000000L,
+            lastSyncTimestamp = 1750000000000L
         )
 
         val entity = domain.toEntity()
@@ -33,6 +36,9 @@ class PromoEntityMappingTest {
         assertEquals(1024L * 1024L * 250L, entity.initialUsageOffsetBytes)
         assertEquals(SimSlot.SIM_2, entity.simSlot)
         assertEquals(true, entity.isActive)
+        assertEquals(1234567.89, entity.lastActiveBurnRate)
+        assertEquals(50000000L, entity.lastSyncDataUsedBytes)
+        assertEquals(1750000000000L, entity.lastSyncTimestamp)
 
         val restoredDomain = entity.toDomain()
         assertEquals(domain, restoredDomain)
@@ -48,7 +54,10 @@ class PromoEntityMappingTest {
             expirationTimestamp = null,
             initialUsageOffsetBytes = 4L * 1024L * 1024L * 1024L,
             simSlot = SimSlot.SIM_1,
-            isActive = true
+            isActive = true,
+            lastActiveBurnRate = null,
+            lastSyncDataUsedBytes = 0L,
+            lastSyncTimestamp = 0L
         )
 
         val entity = domain.toEntity()
@@ -57,6 +66,9 @@ class PromoEntityMappingTest {
         assertEquals("Smart Magic Data 399", entity.name)
         assertNull(entity.expirationTimestamp)
         assertEquals(4L * 1024L * 1024L * 1024L, entity.initialUsageOffsetBytes)
+        assertNull(entity.lastActiveBurnRate)
+        assertEquals(0L, entity.lastSyncDataUsedBytes)
+        assertEquals(0L, entity.lastSyncTimestamp)
 
         val restoredDomain = entity.toDomain()
         assertEquals(domain, restoredDomain)

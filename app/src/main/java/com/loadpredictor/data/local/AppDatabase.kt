@@ -15,7 +15,7 @@ import com.loadpredictor.data.local.entity.PromoEntity
  */
 @Database(
     entities = [PromoEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,6 +35,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from version 2 to 3: adds `last_active_burn_rate`, `last_sync_data_used_bytes`,
+         * and `last_sync_timestamp` columns to persist active velocity across app restarts and idle periods.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE promos ADD COLUMN last_active_burn_rate REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE promos ADD COLUMN last_sync_data_used_bytes INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE promos ADD COLUMN last_sync_timestamp INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -45,7 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

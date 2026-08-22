@@ -44,7 +44,8 @@ architecture follows from that one decision.
 |---|---|
 | Language | Kotlin |
 | UI | Jetpack Compose (Material 3) |
-| Local storage | Room + DataStore |
+| Navigation | androidx.navigation3 (type-safe composable routes) |
+| Local storage | Room + DataStore Preferences |
 | Background work | WorkManager |
 | Home screen widget | Jetpack Glance |
 | Backend | None — fully on-device by design |
@@ -58,11 +59,27 @@ not simplify.
 
 ```
 app/src/main/java/com/loadpredictor/
-├── data/          # Room DB, NetworkStatsManager source, repositories
-├── domain/        # Pure Kotlin models, use cases, forecast engine
-│                    (zero Android dependencies — fully unit-testable)
-├── presentation/  # Compose screens, ViewModels, Glance widget
-└── worker/        # WorkManager jobs — periodic usage sync, threshold alerts
+├── data/
+│   ├── local/         # Room DB, DAOs, Entities, NotificationPreferencesDataSource
+│   ├── notification/  # NotificationHelper (local threshold alerts)
+│   ├── repository/    # PromoRepositoryImpl, UsageRepositoryImpl
+│   └── stats/         # NetworkStatsDataSource, UsageAccessHelper
+├── domain/
+│   ├── engine/        # BurnRateEngine — pure Kotlin, zero Android deps, fully unit-testable
+│   ├── model/         # Promo, BurnForecast, BurnPace, UsageBucket, AlertPreferences, …
+│   ├── repository/    # Repository interfaces
+│   ├── time/          # TimeProvider — injectable clock for deterministic testing
+│   └── usecase/       # GetActiveBurnForecastUseCase, GetDailyUsageBreakdownUseCase, …
+├── presentation/
+│   ├── alerts/        # Alerts settings screen (AlertsScreen, AlertsViewModel)
+│   ├── common/        # Shared Compose components, design tokens, formatters
+│   ├── dashboard/     # RadialPaceRing, DailyUsageChartCard, DashboardStatChips, …
+│   ├── history/       # HistoryScreen with InteractiveUsageChart & time-range pills
+│   ├── navigation/    # Top-level NavGraph and route definitions
+│   ├── promo/         # PromoEntryDialog, PromoManagementScreen, PromoPresets
+│   ├── theme/         # Material 3 theme tokens
+│   └── widget/        # Glance widget layouts (2×2/4×2), WidgetSyncHelper, WidgetReceiver
+└── worker/            # UsageSyncWorker (periodic sync + threshold eval + widget update)
 ```
 
 The forecast engine lives in `domain/engine/` as plain Kotlin with no Android
@@ -89,67 +106,143 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
   The engine calculates the historical consumed offset and anchors live
   velocity tracking strictly to device measurements from that point forward.
 
+- **Emulator limitation.** `NetworkStatsManager` returns no meaningful mobile
+  usage data on emulators. All real-usage testing must be done on a physical
+  device with an active SIM. Verified on Samsung Galaxy A22 5G (SM-A226B,
+  Android 13) against an active Smart Communications prepaid SIM.
+
+---
+
+## Current Status — v1 MVP ✅
+
+**Built and verified on physical hardware (SM-A226B, Android 13) against an
+active Smart Communications prepaid SIM.**
+
+The complete v1 feature set is implemented across **54 JVM unit tests** and
+**8 on-device instrumented tests**.
+
+### What's in the app right now
+
+| Feature | Status |
+|---|---|
+| Manual promo configuration (GigaSurf, Magic Data, Power All, Smart Bro presets) | ✅ Done |
+| Remaining-balance offset input (for mid-cycle starts) | ✅ Done |
+| Device-level mobile data measurement via `NetworkStatsManager` (mobile-only, WiFi excluded) | ✅ Done |
+| Usage Access permission gate with explicit empty-state UI and deep-link to settings | ✅ Done |
+| Burn-rate forecast engine (`BurnRateEngine`) — pure Kotlin, zero Android deps | ✅ Done |
+| Plain-language forecast sentence ("At current pace…") | ✅ Done |
+| Pace classification: `BURNING_FAST` / `ON_TRACK` / `CONSERVATIVE` / `DEPLETED` / `INSUFFICIENT_DATA` | ✅ Done |
+| Burn Status Index (data-consumed % vs. time-elapsed %) | ✅ Done |
+| Stabilization window: `INSUFFICIENT_DATA` for first hour AND < 10 MB used | ✅ Done |
+| Radial pace ring gauge (dashboard visual) | ✅ Done |
+| Daily usage breakdown chart with interactive bar inspection | ✅ Done |
+| History screen with 7 / 14 / 30-day time-range toggle and metrics row | ✅ Done |
+| Manual dual-SIM toggle (SIM 1 / SIM 2 active promo context switching) | ✅ Done |
+| Local threshold notifications at 50% / 80% / 90% and premature-depletion warnings | ✅ Done |
+| Anti-re-fire suppression (notifications don't repeat once dismissed) | ✅ Done |
+| Alerts settings screen (per-alert type opt-in / opt-out) | ✅ Done |
+| Jetpack Glance home screen widget — 2×2 compact and 4×2 wide layouts | ✅ Done |
+| Widget: remaining data, time-to-expiry, pace status pill, SIM badge | ✅ Done |
+| Widget manual refresh action (WorkManager-triggered) | ✅ Done |
+| Widget placement lifecycle sync | ✅ Done |
+| WorkManager periodic background sync (1–2 hr cadence; threshold evaluation on same job) | ✅ Done |
+| Forecast engine unit tests: zero-usage, boundary, over-100%, zero-burn-rate | ✅ 54 JVM |
+| On-device instrumented tests | ✅ 8 tests |
+
+---
+
 ## Roadmap
 
-### v1 — MVP (Complete)
+### v2 — Planned, not started
 
-**Phase 1 — Foundation (complete)**
-- [x] Room persistence layer for promos (entity, DAO, repository)
-- [x] Device-level mobile data measurement (`NetworkStatsManager` wrapper,
-      mobile-only wildcard template query (`subscriberId = null`))
-- [x] Usage Access permission check + explicit "not granted" UI state
-- [x] StateFlow-driven ViewModel architecture (`MainViewModel`, `PromoViewModel`)
-- [x] Distinct handling for "permission denied" vs. "genuine zero usage"
-      (`UsageAccessDeniedException`)
-- [x] Unit + instrumented test coverage for the above, verified on-device
+Highest-priority features that meaningfully extend the app beyond MVP scope,
+ordered by impact and implementation viability.
 
-**Phase 2 — Forecast Engine & Promo Management UI (complete)**
-- [x] Burn-rate forecast engine with plain-language output (`BurnRateEngine`,
-      `GetActiveBurnForecastUseCase` — implemented, unit tested, verified
-      on-device across Calibrating/On-Track/etc. pace states)
-- [x] Manual promo entry screen (`PromoEntryDialog`, `PromoManagementScreen` —
-      full UI implemented, including presets and remaining-balance input)
-- [x] Manual dual-SIM toggle UI (implemented and verified switching active
-      context between SIM 1/SIM 2 on-device)
-- [x] Forecast engine unit tests (zero-usage, boundary, over-100%,
-      zero-burn-rate cases — all covered in `BurnRateEngineTest`)
+#### High Priority
 
-**Phase 3 — UI & Background Services (complete)**
-- [x] Daily usage graph (last 7–30 days bounded by promo lifecycle with interactive bar inspection)
-- [x] Threshold-based local notifications (50% / 80% / 90% and premature depletion warnings with anti-re-fire suppression)
-- [x] Home screen widget (Jetpack Glance) — responsive 2x2 compact and 4x2 wide layouts, remaining data + total allowance with synchronized decimal precision, SIM badge, burn pace status, manual refresh, and placement lifecycle sync
+- [ ] **Confidence interval display** — instead of a single depletion timestamp,
+      show a range ("runs out between Wed 2 PM – Thu 8 AM") based on observed
+      usage variance over recent days. `BurnForecast` already captures the raw
+      data; this is a presentation and engine enhancement.
+- [ ] **Weekday vs. weekend usage pattern awareness** — detect that weekend usage
+      is systematically higher (or lower) and factor that into the depletion
+      estimate ("You use 2× more data on weekends — your promo won't last if this
+      pattern continues"). Requires usage history bucketed by day-of-week.
+- [ ] **Promo editing workflow** — promos can currently be created and deleted
+      but not edited in-place. An edit flow (adjust allowance, validity, offset)
+      is a clear UX gap for promos that get extended or topped up.
+- [ ] **Projected depletion mini-chart on the home screen widget** — render a
+      small curve showing the projected usage trajectory alongside remaining data
+      (🟢 will last / 🟡 cutting it close / 🔴 will run out early). The Glance
+      widget pipeline and data are already in place; this is a layout and
+      data-shape addition.
+- [ ] **Multi-carrier presets beyond Smart** — Globe and DITO promo templates
+      and balance formatting. The promo data model is already carrier-agnostic;
+      this is primarily a `PromoPresets.kt` and UI labels change.
 
-### v2 — deferred, not started
-- [ ] Multi-carrier support beyond Smart (Globe, DITO presets and balance formatting)
-- [ ] Notification-listener-based auto balance detection (`NotificationListenerService` parsing telco balance SMS / USSD alerts)
-- [ ] Dedicated promo editing UI workflow (adjust allowance, validity, and initial offset in-place)
-- [ ] Weekday/weekend usage pattern awareness
+#### Medium Priority
 
-### v3 — deferred, not started
-- [ ] Smart reload reminders tied to predicted empty-date
-- [ ] Premium tier / monetization (if converted from showcase to real launch)
-- [ ] Play Store deployment
+- [ ] **Budget mode / daily data cap** — let users set a daily GB/MB ceiling
+      and show real-time progress toward it on the dashboard. WorkManager already
+      runs on a 1–2 hr cadence; a daily cap threshold check can ride the same
+      job. Push notification: "You're 40% through today's budget and it's only
+      11 AM."
+- [ ] **Dual-SIM / multi-promo combined timeline** — show both active SIM promo
+      contexts simultaneously with a "covered until X" combined view, rather than
+      requiring a manual toggle.
+- [ ] **Notification-listener-based auto-balance detection**
+      (`NotificationListenerService`) — parse telco balance notification alerts
+      to update remaining allowance automatically, eliminating manual-entry
+      friction. `READ_SMS` is a non-starter under Google Play policy;
+      `NotificationListenerService` is the viable path.
+- [ ] **Exportable usage report ("Data Diary")** — weekly summary shareable as
+      a screenshot or export: "You used 1.2 GB this week. At this rate you'd
+      save ₱150/month by switching to…" `HistoryScreen` and
+      `InteractiveUsageChart` already render the necessary data; this is
+      primarily a share/export layer.
+
+#### Lower Priority / v3
+
+- [ ] **Promo recommendation engine** — a local, offline database of PH telco
+      promos that suggests "Based on your usage pattern, GOMO 299 would be 30%
+      cheaper than GigaSurf 99 and would actually last the full period." Requires
+      curating and maintaining a promo database — valuable, but deferred until
+      the core loop is validated with real users.
+- [ ] **Per-app data breakdown** — show how much each app contributes to the
+      total burn rate ("Instagram used 800 MB in the background this week").
+      `PACKAGE_USAGE_STATS`, which the app already holds, gives access to
+      per-package network stats; this is a query and presentation change. UI
+      messaging must clarify this reflects all-network stats, not mobile-only.
+- [ ] **Smart reload reminder** — a notification triggered by the predicted
+      empty-date, telling the user to reload before they run out.
+- [ ] **Community promo database** — crowd-sourced, user-submitted promo
+      listings. Requires a backend (out of on-device scope) and ongoing
+      moderation.
+- [ ] **Play Store deployment** and potential monetization/premium tier.
+
+---
 
 ## Getting Started
 
 ```bash
 git clone <repo-url>
 cd load-predictor
-# Open in Android Studio or Antigravity
-# Build & run on a device with a real mobile data connection —
-# usage stats are not meaningful on an emulator
+# Open in Android Studio (Hedgehog or later) or Antigravity IDE
+# Build & run on a physical device with a real mobile data SIM —
+# NetworkStatsManager returns no meaningful data on emulators
 ```
+
+**Minimum requirements:**
+- Android 8.0 (API 26) minimum SDK
+- Android 13 (API 33) tested / primary target
+- Physical device with an active mobile data SIM required for meaningful usage readings
 
 On first launch, the app will prompt for Usage Access
 (`Settings.ACTION_USAGE_ACCESS_SETTINGS`) — this is required for the
 forecast to function and is requested explicitly with context, not silently.
 
-## Status
-
-**v1 MVP Complete.** Built and verified on physical hardware (Samsung Galaxy A22 5G / SM-A226B, Android 13) against an active Smart Communications prepaid SIM.
-
-The complete v1 feature set — NetworkStats-driven mobile usage measurement, pure Kotlin mathematical forecast engine, promo management with dual-SIM context switching, native Compose daily consumption graph, threshold & premature depletion alerts with anti-re-fire suppression, and responsive 2x2/4x2 Glance home screen widgets — is implemented and verified across 54 JVM unit tests and 8 on-device instrumented tests.
+---
 
 ## License
 
-MIT (or update to your preference)
+MIT

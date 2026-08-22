@@ -374,11 +374,102 @@ class BurnRateEngineTest {
             startTimestamp = start,
             expirationTimestamp = null
         )
-
-        // 6 GB used (18 GB remaining)
         val used = 6L * 1024L * 1024L * 1024L
         val forecast = engine.calculateForecast(promo, used, start + 30 * 60 * 1000L)
 
         assertEquals("Calibrating pace • 18.0 GB remaining.", forecast.plainLanguageSummary)
+    }
+
+    @Test
+    fun `flat usage across idle hours on WiFi does NOT drift projected date forward when lastActiveBurnRate is present`() {
+        val start = 1_000_000L
+        val activeUsedBytes = 2L * 1024L * 1024L * 1024L // 2 GB active usage
+        val allowance = 20L * 1024L * 1024L * 1024L // 20 GB allowance (18 GB remaining)
+        val activeTime = start + 10 * 3_600_000L // 10 hours elapsed -> 0.2 GB/hr
+        val activeBurnRate = (activeUsedBytes.toDouble() / 10.0) // 200 MB / hr
+
+        val calibratedPromo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = activeBurnRate,
+            lastSyncDataUsedBytes = activeUsedBytes,
+            lastSyncTimestamp = activeTime
+        )
+
+        // Baseline forecast at active time: 18 GB / 0.2 GB/hr = 90 hours remaining
+        val initialForecast = engine.calculateForecast(calibratedPromo, activeUsedBytes, activeTime)
+        val initialDepletion = initialForecast.estimatedDepletionTimestamp!!
+        assertEquals(activeTime + 90 * 3_600_000L, initialDepletion)
+
+        // Simulate 24 hours of idle time on WiFi (no new mobile bytes consumed)
+        val idleTime24h = activeTime + 24 * 3_600_000L
+        val idleForecast24h = engine.calculateForecast(calibratedPromo, activeUsedBytes, idleTime24h)
+
+        // Burn rate must stay frozen at 0.2 GB/hr, NOT decay to 2GB / 34h = 0.058 GB/hr
+        assertEquals(activeBurnRate, idleForecast24h.burnRateBytesPerHour, 0.001)
+
+        // The remaining hours from that point should be 18 GB / 0.2 GB/hr = 90 hours
+        // So depletion timestamp is idleTime24h + 90h = initialDepletion + 24h
+        // In calendar time, the moment of depletion remains 90 hours from now!
+        assertEquals(idleTime24h + 90 * 3_600_000L, idleForecast24h.estimatedDepletionTimestamp)
+        assertEquals(BurnPace.ON_TRACK, idleForecast24h.pace)
+    }
+
+    @Test
+    fun `burst usage followed by long idle period maintains pace stability and does not blow up to infinity`() {
+        val start = 1_000_000L
+        val validityHours = 100L
+        val expiration = start + validityHours * 3_600_000L
+        val allowance = 10L * 1024L * 1024L * 1024L // 10 GB
+
+        // Consumed 5 GB in 20 hours (BURNING_FAST)
+        val activeUsedBytes = 5L * 1024L * 1024L * 1024L
+        val activeTime = start + 20 * 3_600_000L
+        val activeBurnRate = (activeUsedBytes.toDouble() / 20.0) // 0.25 GB / hr
+
+        val promo = Promo(
+            name = "Smart Power All 99",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = expiration,
+            lastActiveBurnRate = activeBurnRate,
+            lastSyncDataUsedBytes = activeUsedBytes,
+            lastSyncTimestamp = activeTime
+        )
+
+        // Simulate 40 hours of device idle on WiFi (time is now 60h elapsed, but 0 new bytes)
+        val idleTime = start + 60 * 3_600_000L
+        val forecast = engine.calculateForecast(promo, activeUsedBytes, idleTime)
+
+        // Rate remains based on last active velocity, pace remains stable
+        assertEquals(activeBurnRate, forecast.burnRateBytesPerHour, 0.001)
+        assertNotNull(forecast.estimatedDepletionTimestamp)
+    }
+
+    @Test
+    fun `active resumption after idle updates burn rate reactively`() {
+        val start = 1_000_000L
+        val allowance = 20L * 1024L * 1024L * 1024L
+
+        // Prior frozen sync: 2 GB in 10h (0.2 GB/hr)
+        val priorUsed = 2L * 1024L * 1024L * 1024L
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = 200_000_000.0,
+            lastSyncDataUsedBytes = priorUsed,
+            lastSyncTimestamp = start + 10 * 3_600_000L
+        )
+
+        // Active resumption: now at 20 hours, new usage is 4 GB (total active rate: 4 GB / 20h = 0.2 GB/hr)
+        val newCurrentTime = start + 20 * 3_600_000L
+        val newUsed = 4L * 1024L * 1024L * 1024L
+        val forecast = engine.calculateForecast(promo, newUsed, newCurrentTime)
+
+        assertEquals((4L * 1024L * 1024L * 1024L).toDouble() / 20.0, forecast.burnRateBytesPerHour, 1.0)
     }
 }

@@ -7,6 +7,8 @@ import android.net.ConnectivityManager
 import android.os.RemoteException
 import com.loadpredictor.domain.model.UsageAccessDeniedException
 import com.loadpredictor.domain.model.UsageBucket
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Data source wrapping Android's [NetworkStatsManager] to query device mobile data metrics.
@@ -66,25 +68,37 @@ class NetworkStatsDataSource(
     }
 
     /**
-     * Queries daily mobile data consumption buckets between [startTime] and [endTime].
+     * Queries daily mobile data consumption buckets between [startTime] and [endTime],
+     * slicing intervals strictly on local calendar midnight boundaries.
      *
+     * @param startTime Start of interval in epoch milliseconds (e.g. promo.startTimestamp or window start).
+     * @param endTime End of interval in epoch milliseconds.
+     * @param zoneId Timezone used to calculate calendar midnight boundaries (defaults to device system default).
      * @throws UsageAccessDeniedException if PACKAGE_USAGE_STATS is not granted or revoked mid-query.
      */
     @Throws(UsageAccessDeniedException::class)
-    fun queryDailyUsageBreakdown(startTime: Long, endTime: Long): List<UsageBucket> {
+    fun queryDailyUsageBreakdown(
+        startTime: Long,
+        endTime: Long,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): List<UsageBucket> {
         if (startTime >= endTime) return emptyList()
 
         val manager = networkStatsManager
             ?: throw UsageAccessDeniedException("NetworkStatsManager system service is unavailable")
 
         val buckets = mutableListOf<UsageBucket>()
-        val oneDayMillis = 24 * 60 * 60 * 1000L
 
         var currentStart = startTime
         @Suppress("DEPRECATION")
         val mobileType = ConnectivityManager.TYPE_MOBILE
         while (currentStart < endTime) {
-            val currentEnd = (currentStart + oneDayMillis).coerceAtMost(endTime)
+            val startZdt = Instant.ofEpochMilli(currentStart).atZone(zoneId)
+            val nextMidnightMillis = startZdt.toLocalDate().plusDays(1)
+                .atStartOfDay(zoneId)
+                .toInstant()
+                .toEpochMilli()
+            val currentEnd = minOf(nextMidnightMillis, endTime)
             try {
                 val bucket = manager.querySummaryForDevice(
                     mobileType,

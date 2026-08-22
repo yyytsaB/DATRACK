@@ -63,6 +63,17 @@ class UsageSyncWorker(
                     val rawUsageBytes = usageRepo.queryMobileUsageBytes(activePromo.startTimestamp, now)
                     val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
 
+                    val isCalibrated = (now - activePromo.startTimestamp >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
+                            (rawUsageBytes >= BurnRateEngine.MIN_MEANINGFUL_USAGE_BYTES)
+                    if (isCalibrated && (rawUsageBytes > activePromo.lastSyncDataUsedBytes || activePromo.lastActiveBurnRate == null)) {
+                        promoRepo.updateSyncState(
+                            promoId = activePromo.id,
+                            burnRate = forecast.burnRateBytesPerHour,
+                            dataUsedBytes = rawUsageBytes,
+                            syncTimestamp = now
+                        )
+                    }
+
                     // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
                     val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
                     val usedPercentage = (usedRatio * 100.0).toInt()

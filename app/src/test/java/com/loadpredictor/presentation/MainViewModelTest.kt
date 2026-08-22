@@ -41,6 +41,17 @@ class MainViewModelTest {
         override suspend fun updatePromo(promo: Promo) {}
         override suspend fun deletePromo(promo: Promo) {}
         override suspend fun setActivePromo(id: Long) {}
+        override suspend fun updateSyncState(promoId: Long, burnRate: Double?, dataUsedBytes: Long, syncTimestamp: Long) {
+            activePromoFlow.value?.let { current ->
+                if (current.id == promoId) {
+                    activePromoFlow.value = current.copy(
+                        lastActiveBurnRate = burnRate,
+                        lastSyncDataUsedBytes = dataUsedBytes,
+                        lastSyncTimestamp = syncTimestamp
+                    )
+                }
+            }
+        }
     }
 
     private val fakeUsageRepository = object : UsageRepository {

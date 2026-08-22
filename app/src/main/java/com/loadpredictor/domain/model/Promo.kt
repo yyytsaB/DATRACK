@@ -32,7 +32,10 @@ data class Promo(
     val expirationTimestamp: Long? = null,
     val initialUsageOffsetBytes: Long = 0L,
     val simSlot: SimSlot = SimSlot.SIM_1,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val lastActiveBurnRate: Double? = null,
+    val lastSyncDataUsedBytes: Long = 0L,
+    val lastSyncTimestamp: Long = 0L
 ) {
     init {
         require(name.isNotBlank()) { "Promo name must not be blank" }
