@@ -10,9 +10,11 @@ Telco apps like the Smart app and GlobeOne already show a live balance
 dashboard. None of them forecast it. This project fills that specific,
 narrow gap.
 
-<!-- 📸 Screenshot / demo GIF placeholder — add once the dashboard + widget are functional -->
-<!-- ![dashboard screenshot](docs/screenshot-dashboard.png) -->
-<!-- ![widget demo](docs/demo-widget.gif) -->
+<!-- 📸 Add real device screenshots here once exported from the device -->
+<!-- Suggested captures: Home dashboard (On-Track state), History screen (Lifetime view), Widget on home screen -->
+<!-- ![home dashboard](docs/screenshot-home.png) -->
+<!-- ![history screen](docs/screenshot-history.png) -->
+<!-- ![home screen widget](docs/screenshot-widget.png) -->
 
 ---
 
@@ -44,8 +46,8 @@ architecture follows from that one decision.
 |---|---|
 | Language | Kotlin |
 | UI | Jetpack Compose (Material 3) |
-| Navigation | androidx.navigation3 (type-safe composable routes) |
-| Local storage | Room + DataStore Preferences |
+| Navigation | androidx.navigation3 — 5-tab bottom nav (Home, Promos, History, Alerts, Widgets) |
+| Local storage | Room (schema v3) + DataStore Preferences |
 | Background work | WorkManager |
 | Home screen widget | Jetpack Glance |
 | Backend | None — fully on-device by design |
@@ -74,8 +76,8 @@ app/src/main/java/com/loadpredictor/
 │   ├── alerts/        # Alerts settings screen (AlertsScreen, AlertsViewModel)
 │   ├── common/        # Shared Compose components, design tokens, formatters
 │   ├── dashboard/     # RadialPaceRing, DailyUsageChartCard, DashboardStatChips, …
-│   ├── history/       # HistoryScreen with InteractiveUsageChart & time-range pills
-│   ├── navigation/    # Top-level NavGraph and route definitions
+│   ├── history/       # HistoryScreen — InteractiveUsageChart, 7D/30D/Lifetime time-range pills
+│   ├── navigation/    # LoadPredictorBottomBar (5-tab), NavDestination enum
 │   ├── promo/         # PromoEntryDialog, PromoManagementScreen, PromoPresets
 │   ├── theme/         # Material 3 theme tokens
 │   └── widget/        # Glance widget layouts (2×2/4×2), WidgetSyncHelper, WidgetReceiver
@@ -113,15 +115,15 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 
 ---
 
-## Current Status — v1 MVP ✅
+## Current Status
 
-**Built and verified on physical hardware (SM-A226B, Android 13) against an
-active Smart Communications prepaid SIM.**
+Built and verified on physical hardware (SM-A226B, Android 13) against an
+active Smart Communications prepaid SIM. Test suite: **84 JVM unit tests**
+across 14 test classes, **11 on-device instrumented tests**.
 
-The complete v1 feature set is implemented across **54 JVM unit tests** and
-**8 on-device instrumented tests**.
+### v1 MVP ✅ (Complete)
 
-### What's in the app right now
+The original core feature set:
 
 | Feature | Status |
 |---|---|
@@ -134,20 +136,31 @@ The complete v1 feature set is implemented across **54 JVM unit tests** and
 | Pace classification: `BURNING_FAST` / `ON_TRACK` / `CONSERVATIVE` / `DEPLETED` / `INSUFFICIENT_DATA` | ✅ Done |
 | Burn Status Index (data-consumed % vs. time-elapsed %) | ✅ Done |
 | Stabilization window: `INSUFFICIENT_DATA` for first hour AND < 10 MB used | ✅ Done |
-| Radial pace ring gauge (dashboard visual) | ✅ Done |
-| Daily usage breakdown chart with interactive bar inspection | ✅ Done |
-| History screen with 7 / 14 / 30-day time-range toggle and metrics row | ✅ Done |
 | Manual dual-SIM toggle (SIM 1 / SIM 2 active promo context switching) | ✅ Done |
 | Local threshold notifications at 50% / 80% / 90% and premature-depletion warnings | ✅ Done |
 | Anti-re-fire suppression (notifications don't repeat once dismissed) | ✅ Done |
-| Alerts settings screen (per-alert type opt-in / opt-out) | ✅ Done |
 | Jetpack Glance home screen widget — 2×2 compact and 4×2 wide layouts | ✅ Done |
 | Widget: remaining data, time-to-expiry, pace status pill, SIM badge | ✅ Done |
 | Widget manual refresh action (WorkManager-triggered) | ✅ Done |
 | Widget placement lifecycle sync | ✅ Done |
 | WorkManager periodic background sync (1–2 hr cadence; threshold evaluation on same job) | ✅ Done |
-| Forecast engine unit tests: zero-usage, boundary, over-100%, zero-burn-rate | ✅ 54 JVM |
-| On-device instrumented tests | ✅ 8 tests |
+
+### Visual & Structural Redesign ✅ (Complete — distinct later phase)
+
+A full post-MVP redesign replacing the single-screen layout with a proper
+multi-screen navigation architecture and polished UI:
+
+| Feature | Status |
+|---|---|
+| 5-tab bottom navigation: **Home · Promos · History · Alerts · Widgets** | ✅ Done |
+| `NavDestination` enum + `LoadPredictorBottomBar` composable | ✅ Done |
+| Radial pace ring gauge (animated arc, dashboard hero element) | ✅ Done |
+| `DashboardStatChips` — compact remaining/used/pace summary row | ✅ Done |
+| Interactive History analytics screen with `InteractiveUsageChart` | ✅ Done |
+| **7D / 30D / Lifetime** time-range toggle (Lifetime = 90-day policy cap) | ✅ Done |
+| `HistoryMetricsRow` — peak day, average daily, and total consumed | ✅ Done |
+| Configurable Alerts screen (per-threshold opt-in/opt-out, `AlertsViewModel`) | ✅ Done |
+| Widgets Gallery screen with home-screen pin request flow (`WidgetsScreen`) | ✅ Done |
 
 ---
 
@@ -219,6 +232,58 @@ ordered by impact and implementation viability.
       listings. Requires a backend (out of on-device scope) and ongoing
       moderation.
 - [ ] **Play Store deployment** and potential monetization/premium tier.
+
+---
+
+## Engineering Notes — Lessons from Real-Device Testing
+
+### The burn-rate stability bug
+
+The most significant post-MVP engineering problem surfaced only after running the
+app for several hours on a real device with mixed usage patterns: the depletion
+projection would drift dramatically during idle periods or when the phone was on
+WiFi for an extended stretch, then suddenly snap to a completely different
+estimate the next time it was opened.
+
+**Root cause (found via multi-hour on-device observation):** The initial engine
+calculated burn rate as a single cumulative figure:
+
+```
+R_burn = total_data_used_since_start / total_time_since_start
+```
+
+This looks correct in theory but collapses in real use. If a user burns 2 GB in
+the first two hours, then spends 10 hours on WiFi doing nothing, the cumulative
+rate keeps dropping toward zero over those idle hours — and the depletion
+estimate keeps stretching further into the future, even though usage behaviour
+has not changed at all. The engine was silently averaging idle time into the
+velocity as if the user had actually slowed down.
+
+**Fix (Room schema v2 → v3):** Three new columns were added to the `promos`
+table via a non-destructive `ALTER TABLE` migration (`MIGRATION_2_3` in
+`AppDatabase`):
+
+- `last_active_burn_rate` — the most recently computed reliable velocity;
+  persisted across app restarts and WorkManager sync cycles.
+- `last_sync_data_used_bytes` — usage snapshot at last sync checkpoint.
+- `last_sync_timestamp` — timestamp of last sync checkpoint.
+
+The engine now computes a **delta-based rate** between the current observation
+and the frozen last-sync checkpoint:
+
+```
+R_active = delta_bytes / delta_time   (only if delta >= 1 MB AND delta_time >= 5 min)
+```
+
+If neither threshold clears — meaning usage since last check was just background
+noise or the phone was idle — the engine preserves the previously frozen
+`last_active_burn_rate` instead of recalculating. This prevents idle/WiFi
+periods from contaminating the velocity estimate. The frozen rate is only
+replaced when real, meaningful active usage is observed.
+
+The result: projections are now stable during idle windows and react correctly
+when real usage resumes. The schema migration was applied non-destructively
+to preserve all existing promo data on upgraded installs.
 
 ---
 
