@@ -449,27 +449,103 @@ class BurnRateEngineTest {
     }
 
     @Test
-    fun `active resumption after idle updates burn rate reactively`() {
+    fun `testSmallBlip_updatesVisibleRemainingBalance_butRetainsFrozenRate`() {
         val start = 1_000_000L
-        val allowance = 20L * 1024L * 1024L * 1024L
+        val allowance = 20L * 1024L * 1024L * 1024L // 20 GB
+        val initialUsed = 2L * 1024L * 1024L * 1024L // 2 GB
+        val initialTime = start + 10 * 3_600_000L // 10h
+        val frozenRate = 200_000_000.0 // 200 MB/hr
 
-        // Prior frozen sync: 2 GB in 10h (0.2 GB/hr)
-        val priorUsed = 2L * 1024L * 1024L * 1024L
         val promo = Promo(
             name = "Smart Magic Data 399",
             totalAllowanceBytes = allowance,
             startTimestamp = start,
             expirationTimestamp = null,
-            lastActiveBurnRate = 200_000_000.0,
-            lastSyncDataUsedBytes = priorUsed,
-            lastSyncTimestamp = start + 10 * 3_600_000L
+            lastActiveBurnRate = frozenRate,
+            lastSyncDataUsedBytes = initialUsed,
+            lastSyncTimestamp = initialTime
         )
 
-        // Active resumption: now at 20 hours, new usage is 4 GB (total active rate: 4 GB / 20h = 0.2 GB/hr)
-        val newCurrentTime = start + 20 * 3_600_000L
-        val newUsed = 4L * 1024L * 1024L * 1024L
-        val forecast = engine.calculateForecast(promo, newUsed, newCurrentTime)
+        // 50 KB background OS traffic blip occurs 1 hour later
+        val blipBytes = 50L * 1024L // 50 KB (< 1 MB threshold)
+        val newTime = initialTime + 3_600_000L // 1 hr later
+        val newUsed = initialUsed + blipBytes
 
-        assertEquals((4L * 1024L * 1024L * 1024L).toDouble() / 20.0, forecast.burnRateBytesPerHour, 1.0)
+        val forecast = engine.calculateForecast(promo, newUsed, newTime)
+
+        // 1. Visible allowance balance reflects ground truth (+50 KB used)
+        assertEquals(newUsed, forecast.dataUsedBytes)
+        assertEquals(allowance - newUsed, forecast.dataRemainingBytes)
+
+        // 2. Velocity remains frozen at previous baseline (rate is NOT corrupted by 50KB / 1hr)
+        assertEquals(frozenRate, forecast.burnRateBytesPerHour, 0.001)
+
+        // 3. Projected depletion timestamp remains stable
+        val expectedRemainingMs = ((forecast.dataRemainingBytes.toDouble() / frozenRate) * 3_600_000.0).toLong()
+        assertEquals(newTime + expectedRemainingMs, forecast.estimatedDepletionTimestamp)
+    }
+
+    @Test
+    fun `genuine sustained usage resumption (20MB over 1 hour) recomputes accurate delta-based rate`() {
+        val start = 1_000_000L
+        val allowance = 20L * 1024L * 1024L * 1024L
+        val initialUsed = 2L * 1024L * 1024L * 1024L // 2 GB
+        val initialTime = start + 10 * 3_600_000L // 10h
+        val oldRate = 200_000_000.0 // 200 MB/hr
+
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = oldRate,
+            lastSyncDataUsedBytes = initialUsed,
+            lastSyncTimestamp = initialTime
+        )
+
+        // 20 MB consumed over 1 hour (20 MB >= 1 MB and 1 hr >= 5 min)
+        val deltaBytes = 20L * 1024L * 1024L
+        val newTime = initialTime + 3_600_000L
+        val newUsed = initialUsed + deltaBytes
+
+        val forecast = engine.calculateForecast(promo, newUsed, newTime)
+
+        // Fresh rate = 20 MB / 1 hr = 20 MB/hr = 20,971,520 B/hr (NOT cumulative 2.02 GB / 11h)
+        val expectedFreshRate = (deltaBytes.toDouble() / 1.0)
+        assertEquals(expectedFreshRate, forecast.burnRateBytesPerHour, 1.0)
+        assertEquals(newUsed, forecast.dataUsedBytes)
+    }
+
+    @Test
+    fun `promo idle for days with periodic tiny blips keeps projected date bounded and stable`() {
+        val start = 1_000_000L
+        val allowance = 20L * 1024L * 1024L * 1024L
+        val initialUsed = 2L * 1024L * 1024L * 1024L
+        val initialTime = start + 10 * 3_600_000L
+        val frozenRate = 100_000_000.0 // 100 MB/hr
+
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = frozenRate,
+            lastSyncDataUsedBytes = initialUsed,
+            lastSyncTimestamp = initialTime
+        )
+
+        // 5 days elapsed with 10 small 20 KB blips (total +200 KB)
+        val fiveDaysMs = 5L * 24L * 3_600_000L
+        val blipUsed = initialUsed + (200L * 1024L)
+        val currentTime = initialTime + fiveDaysMs
+
+        val forecast = engine.calculateForecast(promo, blipUsed, currentTime)
+
+        // Rate must NOT decay to 2 GB / 130h or 200 KB / 5d; it must stay frozen at 100 MB/hr
+        assertEquals(frozenRate, forecast.burnRateBytesPerHour, 0.001)
+
+        // Projected remaining hours is ~193 hours from currentTime (18 GB / 100 MB/hr)
+        val remainingHours = forecast.dataRemainingBytes.toDouble() / frozenRate
+        assertEquals(193.27, remainingHours, 1.0)
     }
 }

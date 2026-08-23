@@ -63,9 +63,27 @@ class UsageSyncWorker(
                     val rawUsageBytes = usageRepo.queryMobileUsageBytes(activePromo.startTimestamp, now)
                     val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
 
-                    val isCalibrated = (now - activePromo.startTimestamp >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
+                    val elapsedTimeMs = maxOf(0L, now - activePromo.startTimestamp)
+                    val isInitialCalibrated = (elapsedTimeMs >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
                             (rawUsageBytes >= BurnRateEngine.MIN_MEANINGFUL_USAGE_BYTES)
-                    if (isCalibrated && (rawUsageBytes > activePromo.lastSyncDataUsedBytes || activePromo.lastActiveBurnRate == null)) {
+
+                    val deltaBytes = if (activePromo.lastSyncDataUsedBytes > 0L) {
+                        rawUsageBytes - activePromo.lastSyncDataUsedBytes
+                    } else {
+                        rawUsageBytes
+                    }
+                    val deltaTimeMs = if (activePromo.lastSyncTimestamp > 0L) {
+                        maxOf(0L, now - activePromo.lastSyncTimestamp)
+                    } else {
+                        elapsedTimeMs
+                    }
+
+                    val shouldPersistSyncState = when {
+                        activePromo.lastActiveBurnRate == null -> isInitialCalibrated
+                        else -> deltaBytes >= BurnRateEngine.MIN_ACTIVE_DELTA_BYTES && deltaTimeMs >= BurnRateEngine.MIN_ACTIVE_DELTA_TIME_MS
+                    }
+
+                    if (shouldPersistSyncState && forecast.burnRateBytesPerHour > 0.0) {
                         promoRepo.updateSyncState(
                             promoId = activePromo.id,
                             burnRate = forecast.burnRateBytesPerHour,

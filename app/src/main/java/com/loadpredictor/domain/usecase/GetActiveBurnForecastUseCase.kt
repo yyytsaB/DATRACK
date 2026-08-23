@@ -37,9 +37,27 @@ class GetActiveBurnForecastUseCase(
                 dataUsedBytesRaw = usedBytes,
                 currentTime = now
             )
-            val isCalibrated = (now - activePromo.startTimestamp >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
+            val elapsedTimeMs = maxOf(0L, now - activePromo.startTimestamp)
+            val isInitialCalibrated = (elapsedTimeMs >= BurnRateEngine.STABILIZATION_WINDOW_MS) &&
                     (usedBytes >= BurnRateEngine.MIN_MEANINGFUL_USAGE_BYTES)
-            if (isCalibrated && (usedBytes > activePromo.lastSyncDataUsedBytes || activePromo.lastActiveBurnRate == null)) {
+
+            val deltaBytes = if (activePromo.lastSyncDataUsedBytes > 0L) {
+                usedBytes - activePromo.lastSyncDataUsedBytes
+            } else {
+                usedBytes
+            }
+            val deltaTimeMs = if (activePromo.lastSyncTimestamp > 0L) {
+                maxOf(0L, now - activePromo.lastSyncTimestamp)
+            } else {
+                elapsedTimeMs
+            }
+
+            val shouldPersistSyncState = when {
+                activePromo.lastActiveBurnRate == null -> isInitialCalibrated
+                else -> deltaBytes >= BurnRateEngine.MIN_ACTIVE_DELTA_BYTES && deltaTimeMs >= BurnRateEngine.MIN_ACTIVE_DELTA_TIME_MS
+            }
+
+            if (shouldPersistSyncState && forecast.burnRateBytesPerHour > 0.0) {
                 promoRepository.updateSyncState(
                     promoId = activePromo.id,
                     burnRate = forecast.burnRateBytesPerHour,

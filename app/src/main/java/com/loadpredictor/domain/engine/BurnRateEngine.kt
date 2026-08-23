@@ -34,6 +34,18 @@ class BurnRateEngine {
         const val MIN_MEANINGFUL_USAGE_BYTES = 10L * 1024L * 1024L // 10 MB
 
         /**
+         * Minimum active mobile data delta in bytes (1 MB) required to recompute a fresh active velocity.
+         * Smaller sub-threshold consumption (e.g. background OS blips) retains the frozen baseline rate.
+         */
+        const val MIN_ACTIVE_DELTA_BYTES = 1L * 1024L * 1024L // 1 MB
+
+        /**
+         * Minimum active elapsed time window in milliseconds (5 minutes) between syncs required
+         * to compute a reliable derivative velocity without short-interval amplification.
+         */
+        const val MIN_ACTIVE_DELTA_TIME_MS = 5L * 60L * 1000L // 5 minutes
+
+        /**
          * Burn Status Index threshold for fast data consumption (>= 25% faster than linear pace).
          */
         const val BURN_FAST_THRESHOLD = 1.25
@@ -80,32 +92,41 @@ class BurnRateEngine {
             maxOf(0L, exp - currentTime)
         }
 
-        // Check calibration status: must clear BOTH the 1-hour time window AND 10 MB volume threshold
-        val isCalibrated = (elapsedTimeMs >= STABILIZATION_WINDOW_MS) &&
+        // Check initial calibration status: must clear BOTH the 1-hour time window AND 10 MB volume threshold
+        val isInitialCalibrated = (elapsedTimeMs >= STABILIZATION_WINDOW_MS) &&
                 (measuredLiveUsageBytes >= MIN_MEANINGFUL_USAGE_BYTES)
 
-        // Detect if fresh mobile data traffic occurred since last recorded sync
-        val hasNewActiveUsage = (measuredLiveUsageBytes > promo.lastSyncDataUsedBytes)
+        val deltaBytes = if (promo.lastSyncDataUsedBytes > 0L) {
+            measuredLiveUsageBytes - promo.lastSyncDataUsedBytes
+        } else {
+            measuredLiveUsageBytes
+        }
+        val deltaTimeMs = if (promo.lastSyncTimestamp > 0L) {
+            maxOf(0L, currentTime - promo.lastSyncTimestamp)
+        } else {
+            elapsedTimeMs
+        }
 
-        // Effective burn rate: use fresh live velocity on active traffic; freeze to last known active rate when idle
+        // Effective burn rate:
+        // 1. Established active velocity: if delta clears threshold (>= 1 MB & >= 5 min), compute fresh delta-based rate;
+        //    otherwise (idle or minor blips), preserve previous frozen rate.
+        // 2. Uncalibrated (lastActiveBurnRate == null): if calibration gate cleared, compute initial baseline rate;
+        //    otherwise 0.0 (calibrating).
         val burnRateBytesPerHour: Double = when {
-            hasNewActiveUsage -> {
-                if (elapsedTimeMs > 0L) {
-                    (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
+            promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0 -> {
+                if (deltaBytes >= MIN_ACTIVE_DELTA_BYTES && deltaTimeMs >= MIN_ACTIVE_DELTA_TIME_MS) {
+                    (deltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0
                 } else {
-                    0.0
+                    promo.lastActiveBurnRate
                 }
             }
-            promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0 -> {
-                promo.lastActiveBurnRate
-            }
-            elapsedTimeMs > 0L -> {
+            isInitialCalibrated && elapsedTimeMs > 0L -> {
                 (measuredLiveUsageBytes.toDouble() / elapsedTimeMs.toDouble()) * 3_600_000.0
             }
             else -> 0.0
         }
 
-        val hasSufficientData = isCalibrated || (promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0)
+        val hasSufficientData = (promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0) || isInitialCalibrated
 
         val estimatedDepletionTimestamp: Long?
         val burnStatusIndex: Double?
