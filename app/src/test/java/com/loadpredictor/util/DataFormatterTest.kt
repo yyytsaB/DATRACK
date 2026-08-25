@@ -85,4 +85,99 @@ class DataFormatterTest {
         assertEquals("100 MB", DataFormatter.formatBytes(100L * oneMb))
         assertEquals("0 MB", DataFormatter.formatBytes(0L))
     }
+
+    @Test
+    fun `depletion date within current calendar year omits year`() {
+        val timeZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+        // Reference: Aug 25, 2026 15:00:00 UTC+8 (epoch ms: 1787641200000)
+        val calNow = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.AUGUST, 25, 15, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = calNow.timeInMillis
+
+        // Future date in same year: Oct 1, 2026 15:00:00 UTC+8 (~37 days later)
+        val calSameYear = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.OCTOBER, 1, 15, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val oct1 = calSameYear.timeInMillis
+
+        val formatted = DataFormatter.formatDepletionDateTime(oct1, now, timeZone)
+        assertEquals("Oct 1 at 3:00 PM", formatted)
+    }
+
+    @Test
+    fun `depletion date across calendar year includes year`() {
+        val timeZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+        // Reference: Aug 25, 2026 15:00:00 UTC+8
+        val calNow = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.AUGUST, 25, 15, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = calNow.timeInMillis
+
+        // Future date in next year: Mar 3, 2027 15:16:00 UTC+8 (~190 days / 6+ months later)
+        val calNextYear = java.util.Calendar.getInstance(timeZone).apply {
+            set(2027, java.util.Calendar.MARCH, 3, 15, 16, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val mar3NextYear = calNextYear.timeInMillis
+
+        val formatted = DataFormatter.formatDepletionDateTime(mar3NextYear, now, timeZone)
+        assertEquals("Mar 3, 2027 at 3:16 PM", formatted)
+    }
+
+    @Test
+    fun `depletion date within 7 days displays day of week and time`() {
+        val timeZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+        // Reference: Tuesday Aug 25, 2026 10:00:00
+        val calNow = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.AUGUST, 25, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = calNow.timeInMillis
+
+        // 2 days later: Thursday Aug 27, 2026 14:30:00
+        val calNear = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.AUGUST, 27, 14, 30, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val nearTime = calNear.timeInMillis
+
+        val formatted = DataFormatter.formatDepletionDateTime(nearTime, now, timeZone)
+        assertEquals("Thursday at 2:30 PM", formatted)
+    }
+
+    @Test
+    fun `formatDate and formatDateRange handle current year and multi-year spans accurately`() {
+        val timeZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+        val cal2026Start = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.AUGUST, 19, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val cal2026End = java.util.Calendar.getInstance(timeZone).apply {
+            set(2026, java.util.Calendar.SEPTEMBER, 1, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val cal2027End = java.util.Calendar.getInstance(timeZone).apply {
+            set(2027, java.util.Calendar.JANUARY, 15, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = cal2026Start.timeInMillis
+
+        // Single date in same year
+        assertEquals("Aug 19", DataFormatter.formatDate(cal2026Start.timeInMillis, now, timeZone))
+        // Single date in next year
+        assertEquals("Jan 15, 2027", DataFormatter.formatDate(cal2027End.timeInMillis, now, timeZone))
+
+        // Same year range
+        assertEquals("Aug 19 – Sep 1", DataFormatter.formatDateRange(cal2026Start.timeInMillis, cal2026End.timeInMillis, now, timeZone))
+
+        // Across year range
+        assertEquals("Aug 19, 2026 – Jan 15, 2027", DataFormatter.formatDateRange(cal2026Start.timeInMillis, cal2027End.timeInMillis, now, timeZone))
+
+        // No expiry range
+        assertEquals("Aug 19 • No Expiry", DataFormatter.formatDateRange(cal2026Start.timeInMillis, null, now, timeZone))
+    }
 }

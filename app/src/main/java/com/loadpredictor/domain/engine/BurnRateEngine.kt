@@ -196,7 +196,7 @@ class BurnRateEngine {
                         } else {
                             "$diffHours hours"
                         }
-                        plainLanguageSummary = "At current pace, ${promo.name} data will run out on ${formatTimestamp(depletionTime)} ($diffText before promo expires)."
+                        plainLanguageSummary = "At current pace, ${promo.name} data will run out on ${formatTimestamp(depletionTime, currentTime)} ($diffText before promo expires)."
                     }
                     index < CONSERVATIVE_THRESHOLD -> {
                         pace = BurnPace.CONSERVATIVE
@@ -212,7 +212,7 @@ class BurnRateEngine {
                 // Non-expiring promo (Smart Magic Data)
                 burnStatusIndex = null
                 pace = BurnPace.ON_TRACK
-                plainLanguageSummary = "At current steady pace, ${promo.name} will run out on ${formatTimestamp(depletionTime)}."
+                plainLanguageSummary = "At current steady pace, ${promo.name} will run out on ${formatTimestamp(depletionTime, currentTime)}."
             }
         }
 
@@ -238,10 +238,9 @@ class BurnRateEngine {
     }
 
     /**
-     * Formats an epoch timestamp into a natural day and time format (e.g., "Tuesday at 4:15 PM").
+     * Formats an epoch timestamp into a natural day and time format (e.g., "Tuesday at 4:15 PM" or "Oct 1 at 3:00 PM" or "Mar 3, 2027 at 3:16 PM").
      */
-    fun formatTimestamp(timestamp: Long): String {
-        val sdf = SimpleDateFormat("EEEE 'at' h:mm a", Locale.US)
-        return sdf.format(Date(timestamp))
+    fun formatTimestamp(timestamp: Long, currentTime: Long = System.currentTimeMillis()): String {
+        return com.loadpredictor.util.DataFormatter.formatDepletionDateTime(timestamp, currentTime)
     }
 }

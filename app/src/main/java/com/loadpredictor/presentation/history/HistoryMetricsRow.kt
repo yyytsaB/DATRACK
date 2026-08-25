@@ -18,9 +18,6 @@ import com.loadpredictor.presentation.theme.TextHighEmphasis
 import com.loadpredictor.presentation.theme.TextLowEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
 import com.loadpredictor.util.DataFormatter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Plain typography inline stats row (Total Burnt, Daily Avg, Peak Day) without any card frames/boxes.

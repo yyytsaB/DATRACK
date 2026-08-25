@@ -92,9 +92,6 @@ import com.loadpredictor.presentation.theme.TextLowEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
 import com.loadpredictor.util.DataFormatter
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Preview and pinning gallery for Glance Home Screen widgets.
@@ -635,8 +632,7 @@ private fun formatDepletionEta(forecast: BurnForecast): String {
     if (forecast.isDepleted) return "Depleted"
     val depletionTime = forecast.estimatedDepletionTimestamp
     if (depletionTime != null && depletionTime > System.currentTimeMillis()) {
-        val sdf = SimpleDateFormat("EEE h:mm a", Locale.US)
-        return "Runs out ${sdf.format(Date(depletionTime))}"
+        return "Runs out ${DataFormatter.formatDepletionDateTime(depletionTime)}"
     }
     return forecast.plainLanguageSummary.ifBlank { "Calibrating pace" }
 }

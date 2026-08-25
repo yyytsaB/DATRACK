@@ -40,10 +40,10 @@ fun DailyUsageTeaserCard(
     modifier: Modifier = Modifier
 ) {
     val dateRangeText = if (buckets.isNotEmpty()) {
-        val sdf = SimpleDateFormat("MMM d", Locale.US)
-        val firstDate = sdf.format(Date(buckets.first().startTimestamp))
-        val lastDate = sdf.format(Date(buckets.last().startTimestamp))
-        "$firstDate – $lastDate"
+        com.loadpredictor.util.DataFormatter.formatDateRange(
+            startTimestamp = buckets.first().startTimestamp,
+            endTimestamp = buckets.last().startTimestamp
+        )
     } else {
         "Recent 14 Days"
     }

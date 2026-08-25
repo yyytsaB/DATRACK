@@ -531,16 +531,7 @@ private fun formatDepletionHeadline(forecast: BurnForecast): String {
         forecast.pace == BurnPace.INSUFFICIENT_DATA -> "Calculating burn pace..."
         est == null -> "Will last until promo ends"
         est <= now -> "Depleting very soon"
-        else -> {
-            val daysDiff = ((est - now) / (1000 * 60 * 60 * 24)).toInt()
-            val sdfDayTime = java.text.SimpleDateFormat("EEEE 'at' h:mm a", java.util.Locale.US)
-            val sdfDateTime = java.text.SimpleDateFormat("MMM d 'at' h:mm a", java.util.Locale.US)
-            if (daysDiff < 7) {
-                sdfDayTime.format(java.util.Date(est))
-            } else {
-                sdfDateTime.format(java.util.Date(est))
-            }
-        }
+        else -> com.loadpredictor.util.DataFormatter.formatDepletionDateTime(est, now)
     }
 }
 
@@ -550,8 +541,7 @@ private fun formatPromoExpiryHeadline(forecast: BurnForecast): String {
     return if (promo.isNoExpiry || promo.expirationTimestamp == null) {
         "No expiration • Data cap only"
     } else {
-        val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
-        val expDateStr = sdf.format(java.util.Date(promo.expirationTimestamp))
+        val expDateStr = com.loadpredictor.util.DataFormatter.formatDate(promo.expirationTimestamp, now)
         val daysLeft = ((promo.expirationTimestamp - now).coerceAtLeast(0L) / (1000 * 60 * 60 * 24)).toInt()
         val daysText = if (daysLeft == 0) "< 1 day" else "$daysLeft ${if (daysLeft == 1) "day" else "days"}"
         "Promo ends $expDateStr • $daysText left"

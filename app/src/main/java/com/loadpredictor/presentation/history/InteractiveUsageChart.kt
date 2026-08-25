@@ -235,11 +235,9 @@ fun InteractiveUsageChart(
 }
 
 private fun formatDayLabel(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEE, MMM d", Locale.US)
-    return sdf.format(Date(timestamp))
+    return DataFormatter.formatDayLabel(timestamp)
 }
 
 private fun formatShortDay(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEE", Locale.US)
-    return sdf.format(Date(timestamp)).take(2)
+    return DataFormatter.formatShortDay(timestamp)
 }

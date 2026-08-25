@@ -168,11 +168,9 @@ private fun DailyBreakdownRow(
 }
 
 private fun formatDateMonthDay(timestamp: Long): String {
-    val sdf = SimpleDateFormat("MMM d", Locale.US)
-    return sdf.format(Date(timestamp))
+    return DataFormatter.formatDate(timestamp)
 }
 
 private fun formatDayOfWeek(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEEE", Locale.US)
-    return sdf.format(Date(timestamp))
+    return DataFormatter.formatDayOfWeek(timestamp)
 }

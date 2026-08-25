@@ -250,11 +250,9 @@ fun DailyUsageChartCard(
 }
 
 private fun formatDayLabel(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEE, MMM d", Locale.US)
-    return sdf.format(Date(timestamp))
+    return com.loadpredictor.util.DataFormatter.formatDayLabel(timestamp)
 }
 
 private fun formatShortDay(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEE", Locale.US)
-    return sdf.format(Date(timestamp)).take(2)
+    return com.loadpredictor.util.DataFormatter.formatShortDay(timestamp)
 }

@@ -98,10 +98,10 @@ fun HistoryScreen(
                 // 1. Context Title, Inline Stats, and Time-Range Selector
                 val promoTitle = uiState.activePromo?.name ?: "All Mobile Data"
                 val dateRangeStr = if (uiState.dailyBuckets.isNotEmpty()) {
-                    val sdf = SimpleDateFormat("MMM d", Locale.US)
-                    val first = sdf.format(Date(uiState.dailyBuckets.first().startTimestamp))
-                    val last = sdf.format(Date(uiState.dailyBuckets.last().startTimestamp))
-                    "$first–$last"
+                    com.loadpredictor.util.DataFormatter.formatDateRange(
+                        startTimestamp = uiState.dailyBuckets.first().startTimestamp,
+                        endTimestamp = uiState.dailyBuckets.last().startTimestamp
+                    )
                 } else {
                     "Recent"
                 }

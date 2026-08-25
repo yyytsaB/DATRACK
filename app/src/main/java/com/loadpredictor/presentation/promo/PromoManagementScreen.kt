@@ -486,8 +486,7 @@ fun PromoItemCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 val snapshotText = when {
                     promo.lastSyncTimestamp > 0L -> {
-                        val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
-                        "Snapshot as of ${sdf.format(java.util.Date(promo.lastSyncTimestamp))}"
+                        "Snapshot as of ${com.loadpredictor.util.DataFormatter.formatDate(promo.lastSyncTimestamp)}"
                     }
                     promo.initialUsageOffsetBytes > 0L -> "Initial baseline snapshot"
                     else -> "Not yet tracked"
@@ -509,13 +508,6 @@ fun PromoItemCard(
 }
 
 private fun formatPromoDateRange(promo: Promo): String {
-    val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
-    val startStr = sdf.format(java.util.Date(promo.startTimestamp))
-    return if (promo.expirationTimestamp != null && promo.expirationTimestamp > promo.startTimestamp) {
-        val endStr = sdf.format(java.util.Date(promo.expirationTimestamp))
-        "$startStr – $endStr"
-    } else {
-        "$startStr • No Expiry"
-    }
+    return com.loadpredictor.util.DataFormatter.formatDateRange(promo.startTimestamp, promo.expirationTimestamp)
 }
 
