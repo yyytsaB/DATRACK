@@ -486,7 +486,7 @@ class BurnRateEngineTest {
     }
 
     @Test
-    fun `genuine sustained usage resumption (20MB over 1 hour) recomputes accurate delta-based rate`() {
+    fun `genuine sustained usage resumption (20MB over 1 hour) recomputes smoothed rate via adaptive EMA`() {
         val start = 1_000_000L
         val allowance = 20L * 1024L * 1024L * 1024L
         val initialUsed = 2L * 1024L * 1024L * 1024L // 2 GB
@@ -510,10 +510,110 @@ class BurnRateEngineTest {
 
         val forecast = engine.calculateForecast(promo, newUsed, newTime)
 
-        // Fresh rate = 20 MB / 1 hr = 20 MB/hr = 20,971,520 B/hr (NOT cumulative 2.02 GB / 11h)
-        val expectedFreshRate = (deltaBytes.toDouble() / 1.0)
-        assertEquals(expectedFreshRate, forecast.burnRateBytesPerHour, 1.0)
+        // Instantaneous rate = 20 MB / 1 hr = 20,971,520 B/hr
+        // Alpha for 1 hour = 1.0 / 4.0 = 0.25
+        // Smoothed rate = 0.25 * 20,971,520 + 0.75 * 200,000,000 = 155,242,880 B/hr
+        val instantaneousRate = deltaBytes.toDouble()
+        val expectedAlpha = 0.25
+        val expectedSmoothedRate = (expectedAlpha * instantaneousRate) + ((1.0 - expectedAlpha) * oldRate)
+
+        assertEquals(expectedSmoothedRate, forecast.burnRateBytesPerHour, 1.0)
         assertEquals(newUsed, forecast.dataUsedBytes)
+    }
+
+    @Test
+    fun `testSequentialActiveUsage_varyingBetween6And20MBPerHour_producesStableDepletionProjection`() {
+        val start = 1_000_000L
+        val allowance = 24L * 1024L * 1024L * 1024L // 24 GB allowance
+        val initialUsed = 6L * 1024L * 1024L * 1024L // 6 GB used (18 GB remaining)
+        val initialTime = start + 24 * 3_600_000L // 24h
+        val initialBaselineRate = 12.0 * 1024.0 * 1024.0 // 12 MB/hr
+
+        var currentPromo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = initialBaselineRate,
+            lastSyncDataUsedBytes = initialUsed,
+            lastSyncTimestamp = initialTime
+        )
+
+        // Simulate the observed sequence of varying hourly rates:
+        // 1. 15.0 MB/hr over ~56 mins (14 MB)
+        // 2. 20.5 MB/hr over ~38 mins (13 MB)
+        // 3. 6.6 MB/hr over ~64 mins (7 MB)
+        // 4. 9.2 MB/hr over ~6 hrs (57 MB)
+        // 5. 12.9 MB/hr over ~6 hrs (81 MB)
+        data class SyncStep(val durationMinutes: Long, val deltaMB: Double)
+        val steps = listOf(
+            SyncStep(56, 14.0),
+            SyncStep(38, 13.0),
+            SyncStep(64, 7.0),
+            SyncStep(360, 57.0),
+            SyncStep(360, 81.0)
+        )
+
+        var currentTime = initialTime
+        var currentUsedBytes = initialUsed
+        val projectedRunwayDaysList = mutableListOf<Double>()
+
+        for (step in steps) {
+            val stepTimeMs = step.durationMinutes * 60_000L
+            val stepBytes = (step.deltaMB * 1024.0 * 1024.0).toLong()
+            currentTime += stepTimeMs
+            currentUsedBytes += stepBytes
+
+            val forecast = engine.calculateForecast(currentPromo, currentUsedBytes, currentTime)
+
+            // Calculate remaining runway in days
+            val runwayDays = (forecast.dataRemainingBytes.toDouble() / forecast.burnRateBytesPerHour) / 24.0
+            projectedRunwayDaysList.add(runwayDays)
+
+            // Update current promo sync state as the use case / worker would
+            currentPromo = currentPromo.copy(
+                lastActiveBurnRate = forecast.burnRateBytesPerHour,
+                lastSyncDataUsedBytes = currentUsedBytes,
+                lastSyncTimestamp = currentTime
+            )
+        }
+
+        // Assert all projected runways across the entire day stay stably bounded within ~50 to 75 days
+        // (rather than wildly swinging between 35 and 115 days / Sep to Dec without EMA)
+        for (runwayDays in projectedRunwayDaysList) {
+            assertTrue("Runway $runwayDays should be >= 45.0 days", runwayDays >= 45.0)
+            assertTrue("Runway $runwayDays should be <= 80.0 days", runwayDays <= 80.0)
+        }
+    }
+
+    @Test
+    fun `testNewPromo_initialCalibration_setsBaselineWithFullWeight_withoutPriorBlending`() {
+        val start = 1_000_000L
+        val allowance = 10L * 1024L * 1024L * 1024L // 10 GB
+        val promo = Promo(
+            name = "Smart Power All 99",
+            totalAllowanceBytes = allowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = null, // Fresh uncalibrated promo
+            lastSyncDataUsedBytes = 0L,
+            lastSyncTimestamp = 0L
+        )
+
+        // 1. Before calibration gate (< 1 hr or < 10 MB): must be INSUFFICIENT_DATA with rate 0.0
+        val uncalibratedForecast = engine.calculateForecast(promo, 5L * 1024L * 1024L, start + 30 * 60_000L)
+        assertEquals(BurnPace.INSUFFICIENT_DATA, uncalibratedForecast.pace)
+        assertEquals(0.0, uncalibratedForecast.burnRateBytesPerHour, 0.001)
+
+        // 2. Exactly at calibration gate (2 hours, 20 MB used): sets baseline with full weight (alpha = 1.0)
+        val calibratedTime = start + 2 * 3_600_000L
+        val calibratedUsed = 20L * 1024L * 1024L
+        val calibratedForecast = engine.calculateForecast(promo, calibratedUsed, calibratedTime)
+
+        // Expected rate = 20 MB / 2 hr = 10 MB/hr = 10,485,760 B/hr
+        val expectedBaselineRate = (calibratedUsed.toDouble() / 2.0)
+        assertEquals(expectedBaselineRate, calibratedForecast.burnRateBytesPerHour, 0.001)
+        assertEquals(BurnPace.ON_TRACK, calibratedForecast.pace)
     }
 
     @Test

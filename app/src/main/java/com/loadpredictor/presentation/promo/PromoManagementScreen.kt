@@ -276,9 +276,11 @@ fun PromoManagementScreen(
                 }
             } else {
                 items(filteredPromos, key = { it.id }) { promo ->
+                    val isActive = (uiState.activePromo?.id == promo.id)
                     PromoItemCard(
                         promo = promo,
-                        isActive = (uiState.activePromo?.id == promo.id),
+                        isActive = isActive,
+                        activeForecast = if (isActive) uiState.activeForecast else null,
                         onSelectActive = { viewModel.selectActivePromo(promo.id) },
                         onDelete = { viewModel.deletePromo(promo) }
                     )
@@ -310,12 +312,22 @@ fun PromoManagementScreen(
 fun PromoItemCard(
     promo: Promo,
     isActive: Boolean,
+    activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     onSelectActive: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dateSubtitle = formatPromoDateRange(promo)
     val totalBytes = promo.totalAllowanceBytes
-    val remainingBytes = (totalBytes - promo.initialUsageOffsetBytes).coerceIn(0L, totalBytes)
+    val remainingBytes = if (isActive && activeForecast != null) {
+        activeForecast.dataRemainingBytes
+    } else {
+        val usedBytes = if (promo.lastSyncDataUsedBytes > 0L) {
+            promo.lastSyncDataUsedBytes
+        } else {
+            promo.initialUsageOffsetBytes
+        }
+        (totalBytes - usedBytes).coerceIn(0L, totalBytes)
+    }
     val remainingRatio = if (totalBytes > 0L) {
         (remainingBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -403,7 +415,7 @@ fun PromoItemCard(
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = Color(0xFF1E2532),
-                            modifier = Modifier.clickable { onSelectActive() }
+                            onClick = onSelectActive
                         ) {
                             Text(
                                 text = "Set Active",
@@ -468,6 +480,29 @@ fun PromoItemCard(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            if (!isActive) {
+                Spacer(modifier = Modifier.height(6.dp))
+                val snapshotText = when {
+                    promo.lastSyncTimestamp > 0L -> {
+                        val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+                        "Snapshot as of ${sdf.format(java.util.Date(promo.lastSyncTimestamp))}"
+                    }
+                    promo.initialUsageOffsetBytes > 0L -> "Initial baseline snapshot"
+                    else -> "Not yet tracked"
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = snapshotText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMediumEmphasis.copy(alpha = 0.6f),
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }

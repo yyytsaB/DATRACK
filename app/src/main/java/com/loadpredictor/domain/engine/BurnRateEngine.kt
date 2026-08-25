@@ -46,6 +46,21 @@ class BurnRateEngine {
         const val MIN_ACTIVE_DELTA_TIME_MS = 5L * 60L * 1000L // 5 minutes
 
         /**
+         * Full adaptation window duration (4 hours). Observations spanning this duration receive the maximum alpha weight.
+         */
+        const val EMA_FULL_ADAPTATION_WINDOW_MS = 4L * 3600L * 1000L // 4 hours
+
+        /**
+         * Minimum smoothing weight (15%) applied to short active observation windows (>= 5 mins).
+         */
+        const val EMA_MIN_ALPHA = 0.15
+
+        /**
+         * Maximum smoothing weight (80%) applied to long multi-hour active observation windows.
+         */
+        const val EMA_MAX_ALPHA = 0.80
+
+        /**
          * Burn Status Index threshold for fast data consumption (>= 25% faster than linear pace).
          */
         const val BURN_FAST_THRESHOLD = 1.25
@@ -108,14 +123,18 @@ class BurnRateEngine {
         }
 
         // Effective burn rate:
-        // 1. Established active velocity: if delta clears threshold (>= 1 MB & >= 5 min), compute fresh delta-based rate;
+        // 1. Established active velocity: if delta clears threshold (>= 1 MB & >= 5 min), compute fresh delta-based rate
+        //    smoothed via Adaptive Time-Weighted Exponential Moving Average (EMA);
         //    otherwise (idle or minor blips), preserve previous frozen rate.
-        // 2. Uncalibrated (lastActiveBurnRate == null): if calibration gate cleared, compute initial baseline rate;
+        // 2. Uncalibrated (lastActiveBurnRate == null): if calibration gate cleared, compute initial baseline rate (alpha = 1.0);
         //    otherwise 0.0 (calibrating).
         val burnRateBytesPerHour: Double = when {
             promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0 -> {
                 if (deltaBytes >= MIN_ACTIVE_DELTA_BYTES && deltaTimeMs >= MIN_ACTIVE_DELTA_TIME_MS) {
-                    (deltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0
+                    val freshInstantaneousRate = (deltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0
+                    val alpha = (deltaTimeMs.toDouble() / EMA_FULL_ADAPTATION_WINDOW_MS.toDouble())
+                        .coerceIn(EMA_MIN_ALPHA, EMA_MAX_ALPHA)
+                    (alpha * freshInstantaneousRate) + ((1.0 - alpha) * promo.lastActiveBurnRate)
                 } else {
                     promo.lastActiveBurnRate
                 }

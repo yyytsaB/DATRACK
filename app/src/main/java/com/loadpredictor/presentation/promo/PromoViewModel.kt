@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 data class PromoUiState(
     val promos: List<Promo> = emptyList(),
     val activePromo: Promo? = null,
+    val activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null
 )
@@ -36,6 +37,7 @@ class PromoViewModel(
     private val promoRepository: PromoRepository,
     private val savePromoUseCase: SavePromoUseCase,
     private val getActivePromoUseCase: GetActivePromoUseCase,
+    private val getActiveBurnForecastUseCase: com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase? = null,
     private val notificationPreferences: NotificationPreferencesDataSource? = null,
     private val onPromoMutated: (() -> Unit)? = null
 ) : ViewModel() {
@@ -46,6 +48,25 @@ class PromoViewModel(
     init {
         observePromos()
         observeActivePromo()
+        observeActiveBurnForecast()
+    }
+
+    private fun observeActiveBurnForecast() {
+        getActiveBurnForecastUseCase?.invoke()
+            ?.onEach { result ->
+                _uiState.update { current ->
+                    when (result) {
+                        is com.loadpredictor.domain.model.BurnForecastResult.Success -> {
+                            current.copy(activeForecast = result.forecast)
+                        }
+                        else -> current.copy(activeForecast = null)
+                    }
+                }
+            }
+            ?.catch {
+                _uiState.update { current -> current.copy(activeForecast = null) }
+            }
+            ?.launchIn(viewModelScope)
     }
 
     private fun observePromos() {
@@ -143,11 +164,13 @@ class PromoViewModel(
                     val usageHelper = com.loadpredictor.data.stats.UsageAccessHelper(appContext)
                     val networkStatsDataSource = com.loadpredictor.data.stats.NetworkStatsDataSource(appContext)
                     val usageRepo = com.loadpredictor.data.repository.UsageRepositoryImpl(usageHelper, networkStatsDataSource)
+                    val getActiveBurnForecastUseCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(promoRepo, usageRepo)
 
                     return PromoViewModel(
                         promoRepository = promoRepo,
                         savePromoUseCase = savePromoUseCase,
                         getActivePromoUseCase = getActivePromoUseCase,
+                        getActiveBurnForecastUseCase = getActiveBurnForecastUseCase,
                         notificationPreferences = notificationPrefs,
                         onPromoMutated = {
                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
