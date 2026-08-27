@@ -32,14 +32,21 @@ class PromoViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private val allPromosFlow = MutableStateFlow<List<Promo>>(emptyList())
     private val activePromoFlow = MutableStateFlow<Promo?>(null)
+    var lastInsertedPromo: Promo? = null
+    var lastUpdatedPromo: Promo? = null
 
     private val fakePromoRepository = object : PromoRepository {
         override fun getActivePromo(): Flow<Promo?> = activePromoFlow
         override fun getAllPromos(): Flow<List<Promo>> = allPromosFlow
         override fun getPromoById(id: Long): Flow<Promo?> = MutableStateFlow(null)
         override fun getActivePromoForSim(simSlot: SimSlot): Flow<Promo?> = MutableStateFlow(null)
-        override suspend fun insertPromo(promo: Promo): Long = 1L
-        override suspend fun updatePromo(promo: Promo) {}
+        override suspend fun insertPromo(promo: Promo): Long {
+            lastInsertedPromo = promo
+            return 1L
+        }
+        override suspend fun updatePromo(promo: Promo) {
+            lastUpdatedPromo = promo
+        }
         override suspend fun deletePromo(promo: Promo) {}
         override suspend fun setActivePromo(id: Long) {}
         override suspend fun updateSyncState(promoId: Long, burnRate: Double?, dataUsedBytes: Long, syncTimestamp: Long) {}
@@ -134,5 +141,95 @@ class PromoViewModelTest {
         val p = state.promos[0]
         assertEquals(2L * 1024L * 1024L * 1024L, p.lastSyncDataUsedBytes)
         assertEquals(5_000_000L, p.lastSyncTimestamp)
+    }
+
+    @Test
+    fun `savePromo with id zero inserts new promo with clean default sync state`() = runTest {
+        val savePromoUseCase = SavePromoUseCase(fakePromoRepository)
+        val getActivePromoUseCase = GetActivePromoUseCase(fakePromoRepository)
+        val viewModel = PromoViewModel(
+            promoRepository = fakePromoRepository,
+            savePromoUseCase = savePromoUseCase,
+            getActivePromoUseCase = getActivePromoUseCase
+        )
+
+        val now = 10_000_000L
+        viewModel.savePromo(
+            name = "GigaSurf 99",
+            allowanceBytes = 2L * 1024L * 1024L * 1024L,
+            startTimestamp = now,
+            expirationTimestamp = now + 7 * 24 * 3_600_000L,
+            initialUsageOffsetBytes = 0L,
+            simSlot = SimSlot.SIM_1,
+            isActive = true,
+            id = 0L
+        )
+
+        advanceUntilIdle()
+
+        assertNotNull(lastInsertedPromo)
+        assertNull(lastUpdatedPromo)
+        assertEquals("GigaSurf 99", lastInsertedPromo!!.name)
+        assertEquals(2L * 1024L * 1024L * 1024L, lastInsertedPromo!!.totalAllowanceBytes)
+        assertEquals(0L, lastInsertedPromo!!.lastSyncDataUsedBytes)
+        assertEquals(0L, lastInsertedPromo!!.lastSyncTimestamp)
+        assertNull(lastInsertedPromo!!.lastActiveBurnRate)
+    }
+
+    @Test
+    fun `savePromo with existing id updates promo, preserves lastSyncDataUsedBytes and lastSyncTimestamp, and nulls lastActiveBurnRate`() = runTest {
+        val existingPromo = Promo(
+            id = 42L,
+            name = "Old Name",
+            totalAllowanceBytes = 10L * 1024L * 1024L * 1024L,
+            startTimestamp = 1_000_000L,
+            expirationTimestamp = 1_000_000L + 7 * 24 * 3_600_000L,
+            initialUsageOffsetBytes = 500L * 1024L * 1024L,
+            simSlot = SimSlot.SIM_1,
+            isActive = true,
+            lastActiveBurnRate = 15_000_000.0,
+            lastSyncDataUsedBytes = 3_000_000_000L,
+            lastSyncTimestamp = 4_000_000L
+        )
+
+        val savePromoUseCase = SavePromoUseCase(fakePromoRepository)
+        val getActivePromoUseCase = GetActivePromoUseCase(fakePromoRepository)
+        val viewModel = PromoViewModel(
+            promoRepository = fakePromoRepository,
+            savePromoUseCase = savePromoUseCase,
+            getActivePromoUseCase = getActivePromoUseCase
+        )
+
+        viewModel.savePromo(
+            name = "Smart Magic Data 399",
+            allowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = existingPromo.startTimestamp,
+            expirationTimestamp = null,
+            initialUsageOffsetBytes = existingPromo.initialUsageOffsetBytes,
+            simSlot = SimSlot.SIM_2,
+            isActive = true,
+            id = existingPromo.id,
+            existingPromo = existingPromo
+        )
+
+        advanceUntilIdle()
+
+        assertNull(lastInsertedPromo)
+        assertNotNull(lastUpdatedPromo)
+        val updated = lastUpdatedPromo!!
+        assertEquals(42L, updated.id)
+        assertEquals("Smart Magic Data 399", updated.name)
+        assertEquals(24L * 1024L * 1024L * 1024L, updated.totalAllowanceBytes)
+        assertEquals(SimSlot.SIM_2, updated.simSlot)
+        assertEquals(existingPromo.startTimestamp, updated.startTimestamp)
+        assertNull(updated.expirationTimestamp)
+        assertEquals(existingPromo.initialUsageOffsetBytes, updated.initialUsageOffsetBytes)
+
+        // Verifying delta anchors are preserved from existingPromo
+        assertEquals(3_000_000_000L, updated.lastSyncDataUsedBytes)
+        assertEquals(4_000_000L, updated.lastSyncTimestamp)
+
+        // Verifying burn rate is reset to null for clean recalibration
+        assertNull(updated.lastActiveBurnRate)
     }
 }

@@ -47,7 +47,7 @@ architecture follows from that one decision.
 | Language | Kotlin |
 | UI | Jetpack Compose (Material 3) |
 | Navigation | androidx.navigation3 — 5-tab bottom nav (Home, Promos, History, Alerts, Widgets) |
-| Local storage | Room (schema v3) + DataStore Preferences |
+| Local storage | Room (schema v4) + DataStore Preferences |
 | Background work | WorkManager |
 | Home screen widget | Jetpack Glance |
 | Backend | None — fully on-device by design |
@@ -118,20 +118,22 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 ## Current Status
 
 Built and verified on physical hardware (SM-A226B, Android 13) against an
-active Smart Communications prepaid SIM. Test suite: **84 JVM unit tests**
-across 14 test classes, **11 on-device instrumented tests**.
+active Smart Communications prepaid SIM. Test suite: **95 JVM unit tests**
+across 15 test classes, **11 on-device instrumented tests**.
 
-### v1 MVP ✅ (Complete)
+### v1 MVP & Enhancements ✅ (Complete)
 
-The original core feature set:
+The core feature set and usability enhancements:
 
 | Feature | Status |
 |---|---|
 | Manual promo configuration (GigaSurf, Magic Data, Power All, Smart Bro presets) | ✅ Done |
+| In-place promo editing (name, allowance, validity, SIM slot with clean baseline recalibration) | ✅ Done |
 | Remaining-balance offset input (for mid-cycle starts) | ✅ Done |
 | Device-level mobile data measurement via `NetworkStatsManager` (mobile-only, WiFi excluded) | ✅ Done |
 | Usage Access permission gate with explicit empty-state UI and deep-link to settings | ✅ Done |
 | Burn-rate forecast engine (`BurnRateEngine`) — pure Kotlin, zero Android deps | ✅ Done |
+| Adaptive Time-Weighted Exponential Moving Average (EMA) rate smoothing | ✅ Done |
 | Plain-language forecast sentence ("At current pace…") | ✅ Done |
 | Pace classification: `BURNING_FAST` / `ON_TRACK` / `CONSERVATIVE` / `DEPLETED` / `INSUFFICIENT_DATA` | ✅ Done |
 | Burn Status Index (data-consumed % vs. time-elapsed %) | ✅ Done |
@@ -145,7 +147,7 @@ The original core feature set:
 | Widget placement lifecycle sync | ✅ Done |
 | WorkManager periodic background sync (1–2 hr cadence; threshold evaluation on same job) | ✅ Done |
 
-### Visual & Structural Redesign ✅ (Complete — distinct later phase)
+### Visual & Structural Redesign ✅ (Complete)
 
 A full post-MVP redesign replacing the single-screen layout with a proper
 multi-screen navigation architecture and polished UI:
@@ -181,9 +183,8 @@ ordered by impact and implementation viability.
       is systematically higher (or lower) and factor that into the depletion
       estimate ("You use 2× more data on weekends — your promo won't last if this
       pattern continues"). Requires usage history bucketed by day-of-week.
-- [ ] **Promo editing workflow** — promos can currently be created and deleted
-      but not edited in-place. An edit flow (adjust allowance, validity, offset)
-      is a clear UX gap for promos that get extended or topped up.
+- [x] **Promo editing workflow** — promos can be edited in-place with instant
+      recalibration and preserved delta tracking baselines.
 - [ ] **Projected depletion mini-chart on the home screen widget** — render a
       small curve showing the projected usage trajectory alongside remaining data
       (🟢 will last / 🟡 cutting it close / 🔴 will run out early). The Glance
@@ -237,7 +238,7 @@ ordered by impact and implementation viability.
 
 ## Engineering Notes — Lessons from Real-Device Testing
 
-### The burn-rate stability bug
+### The burn-rate stability bug & Adaptive EMA
 
 The most significant post-MVP engineering problem surfaced only after running the
 app for several hours on a real device with mixed usage patterns: the depletion
@@ -259,7 +260,7 @@ estimate keeps stretching further into the future, even though usage behaviour
 has not changed at all. The engine was silently averaging idle time into the
 velocity as if the user had actually slowed down.
 
-**Fix (Room schema v2 → v3):** Three new columns were added to the `promos`
+**Fix (Room schema v2 → v3 → v4):** Three new columns were added to the `promos`
 table via a non-destructive `ALTER TABLE` migration (`MIGRATION_2_3` in
 `AppDatabase`):
 
@@ -269,21 +270,21 @@ table via a non-destructive `ALTER TABLE` migration (`MIGRATION_2_3` in
 - `last_sync_timestamp` — timestamp of last sync checkpoint.
 
 The engine now computes a **delta-based rate** between the current observation
-and the frozen last-sync checkpoint:
+and the frozen last-sync checkpoint, smoothed using an **Adaptive Time-Weighted EMA**:
 
 ```
 R_active = delta_bytes / delta_time   (only if delta >= 1 MB AND delta_time >= 5 min)
+alpha = (delta_time / 4_hours).coerceIn(0.15, 0.80)
+R_smoothed = alpha * R_active + (1 - alpha) * R_baseline
 ```
 
 If neither threshold clears — meaning usage since last check was just background
 noise or the phone was idle — the engine preserves the previously frozen
-`last_active_burn_rate` instead of recalculating. This prevents idle/WiFi
-periods from contaminating the velocity estimate. The frozen rate is only
-replaced when real, meaningful active usage is observed.
+`last_active_burn_rate` instead of recalculating.
 
-The result: projections are now stable during idle windows and react correctly
-when real usage resumes. The schema migration was applied non-destructively
-to preserve all existing promo data on upgraded installs.
+Additionally, `MIGRATION_3_4` resets legacy `last_active_burn_rate` values to `NULL`
+so that promos created before the EMA fix immediately recalibrate against ground-truth
+historical pace on first sync.
 
 ---
 

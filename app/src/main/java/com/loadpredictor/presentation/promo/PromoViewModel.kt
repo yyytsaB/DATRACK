@@ -103,6 +103,7 @@ class PromoViewModel(
         simSlot: SimSlot = SimSlot.SIM_1,
         isActive: Boolean = true,
         id: Long = 0L,
+        existingPromo: Promo? = null,
         onSuccess: (Long) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -116,7 +117,10 @@ class PromoViewModel(
                     expirationTimestamp = expirationTimestamp,
                     initialUsageOffsetBytes = initialUsageOffsetBytes,
                     simSlot = simSlot,
-                    isActive = isActive
+                    isActive = isActive,
+                    lastActiveBurnRate = null,
+                    lastSyncDataUsedBytes = existingPromo?.lastSyncDataUsedBytes ?: 0L,
+                    lastSyncTimestamp = existingPromo?.lastSyncTimestamp ?: 0L
                 )
                 val savedId = savePromoUseCase(promo)
                 notificationPreferences?.clearThresholdsForPromo(savedId)

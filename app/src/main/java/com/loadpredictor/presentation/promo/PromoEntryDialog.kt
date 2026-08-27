@@ -83,28 +83,72 @@ enum class DataUnit(val multiplier: Long, val label: String) {
 @Composable
 fun PromoEntryDialog(
     onDismissRequest: () -> Unit,
+    promoToEdit: com.loadpredictor.domain.model.Promo? = null,
     onSavePromo: (
+        id: Long,
         name: String,
         allowanceBytes: Long,
         startTimestamp: Long,
         expirationTimestamp: Long?,
         initialUsageOffsetBytes: Long,
         simSlot: SimSlot,
-        isActive: Boolean
+        isActive: Boolean,
+        existingPromo: com.loadpredictor.domain.model.Promo?
     ) -> Unit
 ) {
+    val isEditMode = promoToEdit != null
     val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedPresetTitle by remember { mutableStateOf<String?>("GigaSurf 99") }
-    var promoName by remember { mutableStateOf("GigaSurf 99") }
-    var allowanceValueStr by remember { mutableStateOf("2") }
-    var selectedUnit by remember { mutableStateOf(DataUnit.GB) }
+    val matchingPreset = remember(promoToEdit) {
+        promoToEdit?.let { promo ->
+            PromoPresets.ALL_PRESETS.firstOrNull { it.title.equals(promo.name, ignoreCase = true) }
+        }
+    }
+
+    val initialAllowancePair = remember(promoToEdit) {
+        if (promoToEdit != null) {
+            val gb = promoToEdit.totalAllowanceBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+            if (gb >= 1.0) {
+                val str = if (gb == gb.toLong().toDouble()) gb.toLong().toString() else "%.2f".format(gb).trimEnd('0').trimEnd('.')
+                Pair(str, DataUnit.GB)
+            } else {
+                val mb = promoToEdit.totalAllowanceBytes / (1024 * 1024)
+                Pair(mb.toString(), DataUnit.MB)
+            }
+        } else {
+            Pair("2", DataUnit.GB)
+        }
+    }
+
+    val initialDurationDays = remember(promoToEdit) {
+        if (promoToEdit?.expirationTimestamp != null) {
+            val days = maxOf(1L, (promoToEdit.expirationTimestamp - promoToEdit.startTimestamp) / (24L * 3_600_000L))
+            days.toString()
+        } else {
+            "7"
+        }
+    }
+
+    var selectedPresetTitle by remember {
+        mutableStateOf<String?>(if (isEditMode) matchingPreset?.title else "GigaSurf 99")
+    }
+    var promoName by remember {
+        mutableStateOf(promoToEdit?.name ?: "GigaSurf 99")
+    }
+    var allowanceValueStr by remember { mutableStateOf(initialAllowancePair.first) }
+    var selectedUnit by remember { mutableStateOf(initialAllowancePair.second) }
     var usedValueStr by remember { mutableStateOf("") }
     var usedUnit by remember { mutableStateOf(DataUnit.MB) }
-    var isNoExpiry by remember { mutableStateOf(false) }
-    var durationDaysStr by remember { mutableStateOf("7") }
-    var selectedSimSlot by remember { mutableStateOf(SimSlot.SIM_1) }
-    var setAsActive by remember { mutableStateOf(true) }
+    var isNoExpiry by remember {
+        mutableStateOf(promoToEdit?.isNoExpiry ?: false)
+    }
+    var durationDaysStr by remember { mutableStateOf(initialDurationDays) }
+    var selectedSimSlot by remember {
+        mutableStateOf(promoToEdit?.simSlot ?: SimSlot.SIM_1)
+    }
+    var setAsActive by remember {
+        mutableStateOf(promoToEdit?.isActive ?: true)
+    }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     fun applyPreset(preset: PromoPreset) {
@@ -146,7 +190,7 @@ fun PromoEntryDialog(
         ) {
             // Header: Title
             Text(
-                text = "Add Promo",
+                text = if (isEditMode) "Edit Promo" else "Add Promo",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextHighEmphasis
@@ -182,14 +226,14 @@ fun PromoEntryDialog(
                         isSelected = isCustomSelected,
                         onClick = {
                             selectedPresetTitle = null
-                            promoName = ""
+                            if (!isEditMode) promoName = ""
                             validationError = null
                         }
                     )
                 }
             }
 
-            // Custom Promo Name Field (if Custom selected)
+            // Custom Promo Name Field (if Custom selected or name differs from preset)
             if (selectedPresetTitle == null) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -291,7 +335,7 @@ fun PromoEntryDialog(
                             validationError = null
                         },
                         placeholder = "7",
-                        suffix = "days from today",
+                        suffix = if (isEditMode) "days total validity" else "days from today",
                         keyboardType = KeyboardType.Number
                     )
                 } else {
@@ -320,35 +364,37 @@ fun PromoEntryDialog(
                 }
             }
 
-            // Section 4: Already used (optional)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Already used (optional)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextMediumEmphasis
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        StyledInputFieldBox(
-                            value = usedValueStr,
-                            onValueChange = {
-                                usedValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
-                                validationError = null
-                            },
-                            placeholder = "0 — for mid-cycle setup",
-                            keyboardType = KeyboardType.Decimal
+            // Section 4: Already used (only for creation / mid-cycle setup)
+            if (!isEditMode) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Already used (optional)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMediumEmphasis
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            StyledInputFieldBox(
+                                value = usedValueStr,
+                                onValueChange = {
+                                    usedValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                    validationError = null
+                                },
+                                placeholder = "0 — for mid-cycle setup",
+                                keyboardType = KeyboardType.Decimal
+                            )
+                        }
+
+                        UnitSegmentPills(
+                            selectedUnit = usedUnit,
+                            onUnitSelected = { usedUnit = it }
                         )
                     }
-
-                    UnitSegmentPills(
-                        selectedUnit = usedUnit,
-                        onUnitSelected = { usedUnit = it }
-                    )
                 }
             }
 
@@ -401,44 +447,76 @@ fun PromoEntryDialog(
                     }
                     val allowanceBytes = (numAllowance * selectedUnit.multiplier).toLong()
 
-                    val usedBytes = if (usedValueStr.isNotBlank()) {
-                        val numUsed = usedValueStr.toDoubleOrNull()
-                        if (numUsed == null || numUsed < 0.0) {
-                            validationError = "Used data cannot be negative."
-                            return@Button
+                    val usedBytes = if (!isEditMode) {
+                        if (usedValueStr.isNotBlank()) {
+                            val numUsed = usedValueStr.toDoubleOrNull()
+                            if (numUsed == null || numUsed < 0.0) {
+                                validationError = "Used data cannot be negative."
+                                return@Button
+                            }
+                            val calcUsedBytes = (numUsed * usedUnit.multiplier).toLong()
+                            if (calcUsedBytes >= allowanceBytes) {
+                                validationError = "Used amount must be less than total allowance."
+                                return@Button
+                            }
+                            calcUsedBytes
+                        } else {
+                            0L
                         }
-                        val calcUsedBytes = (numUsed * usedUnit.multiplier).toLong()
-                        if (calcUsedBytes >= allowanceBytes) {
-                            validationError = "Used amount must be less than total allowance."
-                            return@Button
-                        }
-                        calcUsedBytes
                     } else {
-                        0L
+                        promoToEdit!!.initialUsageOffsetBytes
                     }
 
-                    val now = System.currentTimeMillis()
-                    val startTimestamp = now
-                    val expirationTimestamp: Long? = if (!isNoExpiry) {
-                        val days = durationDaysStr.toIntOrNull()
-                        if (days == null || days <= 0) {
-                            validationError = "Please enter valid duration days (e.g. 7)."
-                            return@Button
+                    if (isEditMode) {
+                        val startTimestamp = promoToEdit!!.startTimestamp
+                        val expirationTimestamp: Long? = if (!isNoExpiry) {
+                            val days = durationDaysStr.toIntOrNull()
+                            if (days == null || days <= 0) {
+                                validationError = "Please enter valid duration days (e.g. 7)."
+                                return@Button
+                            }
+                            startTimestamp + (days * 24L * 3_600_000L)
+                        } else {
+                            null
                         }
-                        startTimestamp + (days * 24L * 3_600_000L)
-                    } else {
-                        null
-                    }
 
-                    onSavePromo(
-                        finalPromoName.trim(),
-                        allowanceBytes,
-                        startTimestamp,
-                        expirationTimestamp,
-                        usedBytes,
-                        selectedSimSlot,
-                        setAsActive
-                    )
+                        onSavePromo(
+                            promoToEdit.id,
+                            finalPromoName.trim(),
+                            allowanceBytes,
+                            startTimestamp,
+                            expirationTimestamp,
+                            usedBytes,
+                            selectedSimSlot,
+                            setAsActive,
+                            promoToEdit
+                        )
+                    } else {
+                        val now = System.currentTimeMillis()
+                        val startTimestamp = now
+                        val expirationTimestamp: Long? = if (!isNoExpiry) {
+                            val days = durationDaysStr.toIntOrNull()
+                            if (days == null || days <= 0) {
+                                validationError = "Please enter valid duration days (e.g. 7)."
+                                return@Button
+                            }
+                            startTimestamp + (days * 24L * 3_600_000L)
+                        } else {
+                            null
+                        }
+
+                        onSavePromo(
+                            0L,
+                            finalPromoName.trim(),
+                            allowanceBytes,
+                            startTimestamp,
+                            expirationTimestamp,
+                            usedBytes,
+                            selectedSimSlot,
+                            setAsActive,
+                            null
+                        )
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -450,7 +528,7 @@ fun PromoEntryDialog(
                 )
             ) {
                 Text(
-                    text = "Save Promo",
+                    text = if (isEditMode) "Save Changes" else "Save Promo",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MintOnPrimary

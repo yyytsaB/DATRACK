@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SimCard
@@ -74,7 +75,7 @@ import com.loadpredictor.presentation.theme.TextHighEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
 
 /**
- * Screen for viewing, switching, adding, and deleting tracked promos.
+ * Screen for viewing, switching, adding, editing, and deleting tracked promos.
  *
  * Matches Panel 3 of the reference design:
  * - Recessed top guidance callout
@@ -90,6 +91,7 @@ fun PromoManagementScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    var promoToEdit by remember { mutableStateOf<Promo?>(null) }
     var selectedSimFilter by remember { mutableStateOf<SimSlot?>(null) } // null = All SIMs
 
     val filteredPromos = remember(uiState.promos, selectedSimFilter) {
@@ -282,17 +284,23 @@ fun PromoManagementScreen(
                         isActive = isActive,
                         activeForecast = if (isActive) uiState.activeForecast else null,
                         onSelectActive = { viewModel.selectActivePromo(promo.id) },
+                        onEdit = { promoToEdit = promo },
                         onDelete = { viewModel.deletePromo(promo) }
                     )
                 }
             }
         }
 
-        if (showAddDialog) {
+        if (showAddDialog || promoToEdit != null) {
             PromoEntryDialog(
-                onDismissRequest = { showAddDialog = false },
-                onSavePromo = { name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive ->
+                promoToEdit = promoToEdit,
+                onDismissRequest = {
+                    showAddDialog = false
+                    promoToEdit = null
+                },
+                onSavePromo = { id, name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive, existingPromo ->
                     viewModel.savePromo(
+                        id = id,
                         name = name,
                         allowanceBytes = allowanceBytes,
                         startTimestamp = startTimestamp,
@@ -300,7 +308,11 @@ fun PromoManagementScreen(
                         initialUsageOffsetBytes = initialUsageOffsetBytes,
                         simSlot = simSlot,
                         isActive = isActive,
-                        onSuccess = { showAddDialog = false }
+                        existingPromo = existingPromo,
+                        onSuccess = {
+                            showAddDialog = false
+                            promoToEdit = null
+                        }
                     )
                 }
             )
@@ -314,6 +326,7 @@ fun PromoItemCard(
     isActive: Boolean,
     activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     onSelectActive: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dateSubtitle = formatPromoDateRange(promo)
@@ -356,7 +369,7 @@ fun PromoItemCard(
                 .fillMaxWidth()
                 .padding(18.dp)
         ) {
-            // Header Row: Promo Name & Dates on Left, Active / Set Active Badge + Delete on Right
+            // Header Row: Promo Name & Dates on Left, Active / Set Active Badge + Edit + Delete on Right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -425,6 +438,18 @@ fun PromoItemCard(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
+                    }
+
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Promo",
+                            tint = MintPrimary.copy(alpha = 0.85f),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
 
                     IconButton(
