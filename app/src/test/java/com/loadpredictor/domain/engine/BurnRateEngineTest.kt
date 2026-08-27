@@ -648,4 +648,55 @@ class BurnRateEngineTest {
         val remainingHours = forecast.dataRemainingBytes.toDouble() / frozenRate
         assertEquals(193.27, remainingHours, 1.0)
     }
+
+    @Test
+    fun `testSanitizedPromo_withNullLastActiveBurnRate_andExistingHistory_calibratesToHistoricalAverage_thenBlendsDeltas`() {
+        val start = 1_000_000L
+        val eightDaysMs = 8L * 24L * 3_600_000L // 192 hours
+        val totalAllowance = 24L * 1024L * 1024L * 1024L // 24 GB
+        val measuredLiveUsage = 584L * 1024L * 1024L // 584 MB (~73 MB/day historical average)
+        val currentTime = start + eightDaysMs
+
+        // Post-migration state: lastActiveBurnRate is NULL, while sync fields remain preserved
+        val sanitizedPromo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = totalAllowance,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = null,
+            lastSyncDataUsedBytes = measuredLiveUsage,
+            lastSyncTimestamp = currentTime
+        )
+
+        // 1. Initial recalibration tick
+        val initialForecast = engine.calculateForecast(sanitizedPromo, measuredLiveUsage, currentTime)
+
+        // Expected rate = 584 MB / 192 hr = 3.041666... MB/hr = ~3,189,333 B/hr
+        val expectedDailyAvgRate = (measuredLiveUsage.toDouble() / 192.0)
+        assertEquals(expectedDailyAvgRate, initialForecast.burnRateBytesPerHour, 1.0)
+        assertEquals(BurnPace.ON_TRACK, initialForecast.pace)
+
+        // 2. Persisted state update following initial calibration
+        val syncedPromo = sanitizedPromo.copy(
+            lastActiveBurnRate = initialForecast.burnRateBytesPerHour,
+            lastSyncDataUsedBytes = measuredLiveUsage,
+            lastSyncTimestamp = currentTime
+        )
+
+        // 3. Subsequent active delta session: 20 MB over 1 hour
+        val deltaBytes = 20L * 1024L * 1024L
+        val nextTime = currentTime + 3_600_000L
+        val nextUsage = measuredLiveUsage + deltaBytes
+
+        val subsequentForecast = engine.calculateForecast(syncedPromo, nextUsage, nextTime)
+
+        // Instantaneous rate = 20 MB/hr, Alpha for 1 hour = 0.25
+        // Smoothed = 0.25 * 20 MB/hr + 0.75 * 3.04 MB/hr = 7.28 MB/hr
+        val instantaneousRate = deltaBytes.toDouble()
+        val expectedAlpha = 0.25
+        val expectedSmoothedRate = (expectedAlpha * instantaneousRate) + ((1.0 - expectedAlpha) * expectedDailyAvgRate)
+
+        assertEquals(expectedSmoothedRate, subsequentForecast.burnRateBytesPerHour, 1.0)
+        assertEquals(nextUsage, subsequentForecast.dataUsedBytes)
+    }
 }

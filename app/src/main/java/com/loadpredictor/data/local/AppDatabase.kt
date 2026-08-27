@@ -15,7 +15,7 @@ import com.loadpredictor.data.local.entity.PromoEntity
  */
 @Database(
     entities = [PromoEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -47,6 +47,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from version 3 to 4: nulls `last_active_burn_rate` for all existing promos
+         * to sanitize contaminated legacy baselines established prior to the delta/EMA fix.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE promos SET last_active_burn_rate = NULL")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -57,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance
