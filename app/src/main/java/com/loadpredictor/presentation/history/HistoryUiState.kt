@@ -3,6 +3,7 @@ package com.loadpredictor.presentation.history
 import com.loadpredictor.domain.model.HistoryTimeRange
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.UsageBucket
+import com.loadpredictor.domain.model.UsagePatternInsight
 
 /**
  * Immutable UI State for the History analytics screen.
@@ -11,6 +12,7 @@ import com.loadpredictor.domain.model.UsageBucket
  * @param selectedRange The active time-range filter (7D, 30D, Lifetime).
  * @param dailyBuckets List of day-by-day consumption buckets for the active promo within [selectedRange].
  * @param selectedBucketTimestamp Timestamp of the currently inspected bar/bucket (stable across ticker refreshes).
+ * @param patternInsight Computed behavioral insight comparing weekday and weekend usage.
  * @param isLoading Whether data is currently loading.
  */
 data class HistoryUiState(
@@ -18,6 +20,7 @@ data class HistoryUiState(
     val selectedRange: HistoryTimeRange = HistoryTimeRange.LAST_7_DAYS,
     val dailyBuckets: List<UsageBucket> = emptyList(),
     val selectedBucketTimestamp: Long? = null,
+    val patternInsight: UsagePatternInsight = UsagePatternInsight.InsufficientData,
     val isLoading: Boolean = true
 ) {
     /**

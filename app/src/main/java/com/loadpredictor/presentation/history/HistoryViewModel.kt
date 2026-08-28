@@ -11,8 +11,10 @@ import com.loadpredictor.data.stats.NetworkStatsDataSource
 import com.loadpredictor.data.stats.UsageAccessHelper
 import com.loadpredictor.domain.model.HistoryTimeRange
 import com.loadpredictor.domain.model.Promo
+import com.loadpredictor.domain.model.UsagePatternInsight
 import com.loadpredictor.domain.usecase.GetActivePromoUseCase
 import com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase
+import com.loadpredictor.domain.usecase.GetUsagePatternInsightUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +31,8 @@ import kotlinx.coroutines.launch
  */
 class HistoryViewModel(
     private val getActivePromoUseCase: GetActivePromoUseCase,
-    private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase
+    private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase,
+    private val getUsagePatternInsightUseCase: GetUsagePatternInsightUseCase = GetUsagePatternInsightUseCase()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -73,6 +76,7 @@ class HistoryViewModel(
                         activePromo = null,
                         dailyBuckets = emptyList(),
                         selectedBucketTimestamp = null,
+                        patternInsight = UsagePatternInsight.InsufficientData,
                         isLoading = false
                     )
                 }
@@ -84,6 +88,8 @@ class HistoryViewModel(
             } catch (e: Exception) {
                 emptyList()
             }
+
+            val insight = getUsagePatternInsightUseCase(buckets)
 
             _uiState.update { current ->
                 // Preserve selection if timestamp still exists in new buckets
@@ -99,6 +105,7 @@ class HistoryViewModel(
                     activePromo = promo,
                     dailyBuckets = buckets,
                     selectedBucketTimestamp = preservedTimestamp,
+                    patternInsight = insight,
                     isLoading = false
                 )
             }
@@ -116,6 +123,7 @@ class HistoryViewModel(
                         it.copy(
                             dailyBuckets = emptyList(),
                             selectedBucketTimestamp = null,
+                            patternInsight = UsagePatternInsight.InsufficientData,
                             isLoading = false
                         )
                     }
@@ -127,6 +135,7 @@ class HistoryViewModel(
                         activePromo = null,
                         dailyBuckets = emptyList(),
                         selectedBucketTimestamp = null,
+                        patternInsight = UsagePatternInsight.InsufficientData,
                         isLoading = false
                     )
                 }
@@ -146,7 +155,13 @@ class HistoryViewModel(
             }
 
             if (promo == null) {
-                _uiState.update { it.copy(dailyBuckets = emptyList(), isLoading = false) }
+                _uiState.update {
+                    it.copy(
+                        dailyBuckets = emptyList(),
+                        patternInsight = UsagePatternInsight.InsufficientData,
+                        isLoading = false
+                    )
+                }
                 return@launch
             }
 
@@ -155,6 +170,8 @@ class HistoryViewModel(
             } catch (e: Exception) {
                 emptyList()
             }
+
+            val insight = getUsagePatternInsightUseCase(buckets)
 
             _uiState.update { current ->
                 val preservedTimestamp = if (current.selectedBucketTimestamp != null &&
@@ -169,6 +186,7 @@ class HistoryViewModel(
                     activePromo = promo,
                     dailyBuckets = buckets,
                     selectedBucketTimestamp = preservedTimestamp,
+                    patternInsight = insight,
                     isLoading = false
                 )
             }
@@ -189,10 +207,12 @@ class HistoryViewModel(
 
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
                     val getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo)
+                    val getUsagePatternInsightUseCase = GetUsagePatternInsightUseCase()
 
                     return HistoryViewModel(
                         getActivePromoUseCase = getActivePromoUseCase,
-                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
+                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase,
+                        getUsagePatternInsightUseCase = getUsagePatternInsightUseCase
                     ) as T
                 }
             }

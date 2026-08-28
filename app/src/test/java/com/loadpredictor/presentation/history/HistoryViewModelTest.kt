@@ -175,4 +175,25 @@ class HistoryViewModelTest {
         assertEquals(bucket1.startTimestamp, viewModel.uiState.value.selectedBucketTimestamp)
         assertEquals(bucket1, viewModel.uiState.value.resolvedSelectedBucket)
     }
+
+    @Test
+    fun `patternInsight is computed when buckets are loaded in HistoryViewModel`() = runTest {
+        val now = 100_000_000L
+        val promo = Promo(
+            id = 1L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = now - (10 * 86_400_000L),
+            expirationTimestamp = null,
+            simSlot = SimSlot.SIM_1
+        )
+
+        every { getActivePromoUseCase() } returns flowOf(promo)
+        coEvery { getDailyUsageBreakdownUseCase(promo, HistoryTimeRange.LAST_7_DAYS) } returns emptyList()
+
+        val viewModel = HistoryViewModel(getActivePromoUseCase, getDailyUsageBreakdownUseCase)
+        advanceUntilIdle()
+
+        assertEquals(com.loadpredictor.domain.model.UsagePatternInsight.InsufficientData, viewModel.uiState.value.patternInsight)
+    }
 }

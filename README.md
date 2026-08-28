@@ -118,8 +118,8 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 ## Current Status
 
 Built and verified on physical hardware (SM-A226B, Android 13) against an
-active Smart Communications prepaid SIM. Test suite: **95 JVM unit tests**
-across 15 test classes, **11 on-device instrumented tests**.
+active Smart Communications prepaid SIM. Test suite: **105 JVM unit tests**
+across 16 test classes, **12 on-device instrumented tests**.
 
 ### v1 MVP & Enhancements ✅ (Complete)
 
@@ -146,6 +146,7 @@ The core feature set and usability enhancements:
 | Widget manual refresh action (WorkManager-triggered) | ✅ Done |
 | Widget placement lifecycle sync | ✅ Done |
 | WorkManager periodic background sync (1–2 hr cadence; threshold evaluation on same job) | ✅ Done |
+| Weekday vs. Weekend usage pattern awareness (isolated read-only History tab insight callout) | ✅ Done |
 
 ### Visual & Structural Redesign ✅ (Complete)
 
@@ -161,6 +162,7 @@ multi-screen navigation architecture and polished UI:
 | Interactive History analytics screen with `InteractiveUsageChart` | ✅ Done |
 | **7D / 30D / Lifetime** time-range toggle (Lifetime = 90-day policy cap) | ✅ Done |
 | `HistoryMetricsRow` — peak day, average daily, and total consumed | ✅ Done |
+| `UsagePatternBanner` — clean callout for detected weekday/weekend variance | ✅ Done |
 | Configurable Alerts screen (per-threshold opt-in/opt-out, `AlertsViewModel`) | ✅ Done |
 | Widgets Gallery screen with home-screen pin request flow (`WidgetsScreen`) | ✅ Done |
 
@@ -179,10 +181,10 @@ ordered by impact and implementation viability.
       show a range ("runs out between Wed 2 PM – Thu 8 AM") based on observed
       usage variance over recent days. `BurnForecast` already captures the raw
       data; this is a presentation and engine enhancement.
-- [ ] **Weekday vs. weekend usage pattern awareness** — detect that weekend usage
-      is systematically higher (or lower) and factor that into the depletion
-      estimate ("You use 2× more data on weekends — your promo won't last if this
-      pattern continues"). Requires usage history bucketed by day-of-week.
+- [x] **Weekday vs. weekend usage pattern awareness** — standalone read-only
+      pattern callout in the History tab ("You use ~2.9x more data on weekdays...")
+      computed strictly from completed daily buckets (excluding today's partial
+      traffic) with sample thresholds (>= 3 weekdays, >= 2 weekends).
 - [x] **Promo editing workflow** — promos can be edited in-place with instant
       recalibration and preserved delta tracking baselines.
 - [ ] **Projected depletion mini-chart on the home screen widget** — render a

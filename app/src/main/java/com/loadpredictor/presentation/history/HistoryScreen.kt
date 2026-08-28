@@ -133,6 +133,9 @@ fun HistoryScreen(
                     )
                 }
 
+                // 2. Behavioral Usage Pattern Banner (automatically stays hidden if InsufficientData)
+                UsagePatternBanner(patternInsight = uiState.patternInsight)
+
                 // 3. Interactive Bar Chart (The single boxed container on this screen)
                 InteractiveUsageChart(
                     buckets = uiState.dailyBuckets,
