@@ -1,0 +1,6 @@
+# Ignore AI agent skills and helper scripts from GitHub language statistics
+.agent/** linguist-detectable=false
+
+# Exclude Gradle wrapper scripts
+gradlew linguist-vendored
+gradlew.bat linguist-vendored
