@@ -196,8 +196,12 @@ class MainViewModel(
 
                     val checkPermissionUseCase = CheckUsagePermissionUseCase(usageRepo)
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
-                    val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(promoRepo, usageRepo)
                     val getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo)
+                    val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(
+                        promoRepository = promoRepo,
+                        usageRepository = usageRepo,
+                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
+                    )
 
                     return MainViewModel(
                         checkUsagePermissionUseCase = checkPermissionUseCase,

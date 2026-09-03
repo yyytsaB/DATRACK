@@ -118,7 +118,7 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 ## Current Status
 
 Built and verified on physical hardware (SM-A226B, Android 13) against an
-active Smart Communications prepaid SIM. Test suite: **105 JVM unit tests**
+active Smart Communications prepaid SIM. Test suite: **112 JVM unit tests**
 across 16 test classes, **12 on-device instrumented tests**.
 
 ### v1 MVP & Enhancements ✅ (Complete)
@@ -185,6 +185,14 @@ ordered by impact and implementation viability.
       pattern callout in the History tab ("You use ~2.9x more data on weekdays...")
       computed strictly from completed daily buckets (excluding today's partial
       traffic) with sample thresholds (>= 3 weekdays, >= 2 weekends).
+- [x] **7-day daily mean forecast anchor** — `GetActiveBurnForecastUseCase` now derives the
+      user-facing depletion projection (`estimatedDepletionTimestamp`, "At this pace" chip) from
+      the rolling 7-day mean of completed daily buckets when ≥ 3 completed calendar days of 
+      history exist. Falls back to the Adaptive EMA when fewer than 3 completed days are 
+      available (e.g. fresh promos). The EMA `lastActiveBurnRate` persisted to the DB is 
+      intentionally preserved as the sync delta anchor; only the user-facing projection rate 
+      is overridden. This makes the "Daily avg" chip and the "At this pace" depletion date 
+      mathematically consistent by construction.
 - [x] **Promo editing workflow** — promos can be edited in-place with instant
       recalibration and preserved delta tracking baselines.
 - [ ] **Projected depletion mini-chart on the home screen widget** — render a
@@ -287,6 +295,33 @@ noise or the phone was idle — the engine preserves the previously frozen
 Additionally, `MIGRATION_3_4` resets legacy `last_active_burn_rate` values to `NULL`
 so that promos created before the EMA fix immediately recalibrate against ground-truth
 historical pace on first sync.
+
+### The idle-then-spike problem & 7-day daily mean anchor
+
+A secondary forecast accuracy issue surfaced after an extended period of low usage followed 
+by a single high-usage session ("extreme mean problem"): the Adaptive EMA, despite its 
+time-weighting, still adapts partially to a spike day, inflating `lastActiveBurnRate` 
+stored in the DB. Subsequent idle days do not self-correct the EMA if `lastSyncTimestamp` 
+is stale — the stored inflated rate simply persists, producing a much earlier projected 
+depletion date than the user's actual recent daily usage would suggest.
+
+**Two-layer fix:**
+
+1. **Spike Guard (`SPIKE_GUARD_MAX_RATE_MULTIPLIER = 4.0`)** in `BurnRateEngine` — clamps 
+   the incoming `freshInstantaneousRate` to at most 4× the stored `lastActiveBurnRate` 
+   before EMA blending, preventing future extreme spikes from pulling the EMA out of 
+   proportion.
+
+2. **7-day daily mean anchor** in `GetActiveBurnForecastUseCase` — when ≥ 3 completed 
+   calendar days of daily bucket history exist, the user-facing depletion projection is 
+   derived from the rolling 7-day mean of those completed buckets (today's partial bucket 
+   is always excluded), rather than the EMA. The EMA continues to govern sync state 
+   persistence; the daily mean governs only what the user sees.
+
+This keeps `BurnRateEngine` strictly pure (zero changes to the mathematical engine) while 
+making the displayed "Daily avg" and "At this pace" figures consistent by construction. 
+Verified live on SM-A226B: 15.3 GB remaining / 209 MB daily avg → "> 60 days" projected 
+runway (Nov 12), matching the manual calculation of ~75 days within normal daily variance.
 
 ---
 

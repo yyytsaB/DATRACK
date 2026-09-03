@@ -683,20 +683,123 @@ class BurnRateEngineTest {
             lastSyncTimestamp = currentTime
         )
 
-        // 3. Subsequent active delta session: 20 MB over 1 hour
-        val deltaBytes = 20L * 1024L * 1024L
+        // 3. Subsequent active delta session: 10 MB over 1 hour (within 4x spike guard threshold)
+        val deltaBytes = 10L * 1024L * 1024L
         val nextTime = currentTime + 3_600_000L
         val nextUsage = measuredLiveUsage + deltaBytes
 
         val subsequentForecast = engine.calculateForecast(syncedPromo, nextUsage, nextTime)
 
-        // Instantaneous rate = 20 MB/hr, Alpha for 1 hour = 0.25
-        // Smoothed = 0.25 * 20 MB/hr + 0.75 * 3.04 MB/hr = 7.28 MB/hr
+        // Instantaneous rate = 10 MB/hr, Alpha for 1 hour = 0.25
+        // Smoothed = 0.25 * 10 MB/hr + 0.75 * 3.04 MB/hr = 4.78 MB/hr
         val instantaneousRate = deltaBytes.toDouble()
         val expectedAlpha = 0.25
         val expectedSmoothedRate = (expectedAlpha * instantaneousRate) + ((1.0 - expectedAlpha) * expectedDailyAvgRate)
 
         assertEquals(expectedSmoothedRate, subsequentForecast.burnRateBytesPerHour, 1.0)
         assertEquals(nextUsage, subsequentForecast.dataUsedBytes)
+    }
+
+    @Test
+    fun `spike guard clamps instantaneous rate when exceeding 4x baseline`() {
+        val start = 1_000_000L
+        val baselineBurnRate = 3.0 * 1024.0 * 1024.0 // 3 MB/hr (~72 MB/day)
+        val lastSyncUsage = 500L * 1024L * 1024L // 500 MB
+        val lastSyncTime = start + 5 * 24 * 3_600_000L // 5 days in
+
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = baselineBurnRate,
+            lastSyncDataUsedBytes = lastSyncUsage,
+            lastSyncTimestamp = lastSyncTime
+        )
+
+        // 4 hours elapsed -> alpha = 4 / 4 = 1.0 coerced to EMA_MAX_ALPHA (0.80)
+        val deltaTimeMs = 4L * 3_600_000L
+        val currentTime = lastSyncTime + deltaTimeMs
+
+        // Simulate a massive binge spike: 240 MB in 4 hours = 60 MB/hr = 20x baseline!
+        val spikeDeltaBytes = 240L * 1024L * 1024L
+        val totalUsage = lastSyncUsage + spikeDeltaBytes
+
+        val forecast = engine.calculateForecast(promo, totalUsage, currentTime)
+
+        val unclampedInstantaneousRate = (spikeDeltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0 // 60 MB/hr
+        val clampedRate = baselineBurnRate * BurnRateEngine.SPIKE_GUARD_MAX_RATE_MULTIPLIER // 4 * 3 MB/hr = 12 MB/hr
+        val alpha = BurnRateEngine.EMA_MAX_ALPHA // 0.80
+        val expectedRate = (alpha * clampedRate) + ((1.0 - alpha) * baselineBurnRate) // 0.8 * 12 + 0.2 * 3 = 10.2 MB/hr
+
+        val unclampedProjectedRate = (alpha * unclampedInstantaneousRate) + ((1.0 - alpha) * baselineBurnRate) // 0.8 * 60 + 0.2 * 3 = 48.6 MB/hr
+
+        assertEquals(expectedRate, forecast.burnRateBytesPerHour, 1.0)
+        assertTrue("Burn rate must be much lower than unclamped rate", forecast.burnRateBytesPerHour < unclampedProjectedRate)
+        assertTrue(
+            "Burn rate cannot exceed baseline * (SPIKE_GUARD_MAX_RATE_MULTIPLIER + 1)",
+            forecast.burnRateBytesPerHour < baselineBurnRate * (BurnRateEngine.SPIKE_GUARD_MAX_RATE_MULTIPLIER + 1.0)
+        )
+    }
+
+    @Test
+    fun `spike guard is transparent when instantaneous rate is within 4x baseline`() {
+        val start = 1_000_000L
+        val baselineBurnRate = 3.0 * 1024.0 * 1024.0 // 3 MB/hr
+        val lastSyncUsage = 500L * 1024L * 1024L
+        val lastSyncTime = start + 5 * 24 * 3_600_000L
+
+        val promo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = baselineBurnRate,
+            lastSyncDataUsedBytes = lastSyncUsage,
+            lastSyncTimestamp = lastSyncTime
+        )
+
+        val deltaTimeMs = 2L * 3_600_000L // 2 hours -> alpha = 2 / 4 = 0.50
+        val currentTime = lastSyncTime + deltaTimeMs
+
+        // Rate = 6 MB/hr = exactly 2x baseline (< 4x multiplier)
+        val deltaBytes = 12L * 1024L * 1024L // 12 MB in 2 hours = 6 MB/hr
+        val totalUsage = lastSyncUsage + deltaBytes
+
+        val forecast = engine.calculateForecast(promo, totalUsage, currentTime)
+
+        val freshInstantaneousRate = (deltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0
+        val alpha = 0.50
+        val expectedDirectRate = (alpha * freshInstantaneousRate) + ((1.0 - alpha) * baselineBurnRate)
+
+        assertEquals(expectedDirectRate, forecast.burnRateBytesPerHour, 1.0)
+    }
+
+    @Test
+    fun `spike guard is inert when lastActiveBurnRate is null during initial calibration`() {
+        val start = 1_000_000L
+        val elapsedMs = 2L * 3_600_000L // 2 hours (> 1 hr stabilization)
+        val currentTime = start + elapsedMs
+
+        // Promo has null lastActiveBurnRate (e.g. freshly created or post-migration)
+        val uncalibratedPromo = Promo(
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = start,
+            expirationTimestamp = null,
+            lastActiveBurnRate = null,
+            lastSyncDataUsedBytes = 0L,
+            lastSyncTimestamp = 0L
+        )
+
+        // Large burst of 100 MB in 2 hours = 50 MB/hr (> 10 MB min meaningful usage)
+        val usageBytes = 100L * 1024L * 1024L
+
+        val forecast = engine.calculateForecast(uncalibratedPromo, usageBytes, currentTime)
+
+        // Cumulative path: 100 MB / 2 hours = 50 MB/hr
+        val expectedRate = (usageBytes.toDouble() / elapsedMs.toDouble()) * 3_600_000.0
+        assertEquals(expectedRate, forecast.burnRateBytesPerHour, 1.0)
+        assertEquals(BurnPace.ON_TRACK, forecast.pace)
     }
 }

@@ -61,6 +61,23 @@ class BurnRateEngine {
         const val EMA_MAX_ALPHA = 0.80
 
         /**
+         * Maximum ratio by which a single fresh instantaneous rate observation may exceed
+         * the current established EMA baseline before it is clamped.
+         *
+         * Protects against the "idle-then-spike" failure: after several stagnant days with
+         * no sync (deltaBytes < MIN_ACTIVE_DELTA_BYTES keeps lastSyncTimestamp frozen),
+         * a single high-usage session arrives with a large deltaTimeMs window and high
+         * deltaBytes, producing a freshInstantaneousRate many multiples above normal.
+         * At EMA_MAX_ALPHA (0.80), this collapses the forecast by weeks.
+         *
+         * With K = 4.0, a spike can at most contribute 4× the current baseline to the EMA
+         * blend, capping the single-step forecast shift to a recoverable level.
+         * Genuine sustained usage changes still adapt fully — it takes more than one
+         * observation at the capped rate to move the EMA significantly.
+         */
+        const val SPIKE_GUARD_MAX_RATE_MULTIPLIER = 4.0
+
+        /**
          * Burn Status Index threshold for fast data consumption (>= 25% faster than linear pace).
          */
         const val BURN_FAST_THRESHOLD = 1.25
@@ -124,7 +141,7 @@ class BurnRateEngine {
 
         // Effective burn rate:
         // 1. Established active velocity: if delta clears threshold (>= 1 MB & >= 5 min), compute fresh delta-based rate
-        //    smoothed via Adaptive Time-Weighted Exponential Moving Average (EMA);
+        //    clamped to SPIKE_GUARD_MAX_RATE_MULTIPLIER and smoothed via Adaptive Time-Weighted Exponential Moving Average (EMA);
         //    otherwise (idle or minor blips), preserve previous frozen rate.
         // 2. Uncalibrated (lastActiveBurnRate == null): if calibration gate cleared, compute initial baseline rate (alpha = 1.0);
         //    otherwise 0.0 (calibrating).
@@ -132,9 +149,12 @@ class BurnRateEngine {
             promo.lastActiveBurnRate != null && promo.lastActiveBurnRate > 0.0 -> {
                 if (deltaBytes >= MIN_ACTIVE_DELTA_BYTES && deltaTimeMs >= MIN_ACTIVE_DELTA_TIME_MS) {
                     val freshInstantaneousRate = (deltaBytes.toDouble() / deltaTimeMs.toDouble()) * 3_600_000.0
+                    val clampedRate = freshInstantaneousRate.coerceAtMost(
+                        promo.lastActiveBurnRate * SPIKE_GUARD_MAX_RATE_MULTIPLIER
+                    )
                     val alpha = (deltaTimeMs.toDouble() / EMA_FULL_ADAPTATION_WINDOW_MS.toDouble())
                         .coerceIn(EMA_MIN_ALPHA, EMA_MAX_ALPHA)
-                    (alpha * freshInstantaneousRate) + ((1.0 - alpha) * promo.lastActiveBurnRate)
+                    (alpha * clampedRate) + ((1.0 - alpha) * promo.lastActiveBurnRate)
                 } else {
                     promo.lastActiveBurnRate
                 }
