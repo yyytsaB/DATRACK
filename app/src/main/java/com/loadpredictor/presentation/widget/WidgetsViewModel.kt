@@ -135,7 +135,12 @@ class WidgetsViewModel(
                     val networkStatsDataSource = NetworkStatsDataSource(appContext)
                     val usageRepo = UsageRepositoryImpl(usageHelper, networkStatsDataSource)
                     val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
-                    val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(promoRepo, usageRepo)
+                    val getDailyUsageBreakdownUseCase = com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo)
+                    val getActiveBurnForecastUseCase = GetActiveBurnForecastUseCase(
+                        promoRepository = promoRepo,
+                        usageRepository = usageRepo,
+                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
+                    )
 
                     return WidgetsViewModel(
                         getActivePromoUseCase = getActivePromoUseCase,

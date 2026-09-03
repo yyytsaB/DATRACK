@@ -31,12 +31,12 @@ class GetActiveBurnForecastUseCase(
     private val timeProvider: TimeProvider = DefaultTimeProvider(),
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) {
-    suspend fun execute(activePromo: Promo?): BurnForecastResult {
+    suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult {
         if (activePromo == null) {
             return BurnForecastResult.NoActivePromo
         }
         return try {
-            val now = timeProvider.currentTimeMillis()
+            val now = currentTime ?: timeProvider.currentTimeMillis()
             val usedBytes = usageRepository.queryMobileUsageBytes(
                 startTime = activePromo.startTimestamp,
                 endTime = now

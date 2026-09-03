@@ -2,9 +2,12 @@ package com.loadpredictor.presentation.widget
 
 import android.content.Context
 import com.loadpredictor.domain.engine.BurnRateEngine
+import com.loadpredictor.domain.model.BurnForecastResult
 import com.loadpredictor.domain.model.UsageAccessDeniedException
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.repository.UsageRepository
+import com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase
+import com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase
 import kotlinx.coroutines.flow.first
 
 /**
@@ -23,6 +26,7 @@ object WidgetSyncHelper {
         promoRepository: PromoRepository,
         usageRepository: UsageRepository,
         burnRateEngine: BurnRateEngine = BurnRateEngine(),
+        getActiveBurnForecastUseCase: GetActiveBurnForecastUseCase? = null,
         now: Long = System.currentTimeMillis()
     ): WidgetState {
         if (!usageRepository.hasUsageAccess()) {
@@ -35,24 +39,32 @@ object WidgetSyncHelper {
                 return WidgetState.NoActivePromo
             }
 
-            val rawUsageBytes = try {
-                usageRepository.queryMobileUsageBytes(activePromo.startTimestamp, now)
-            } catch (e: UsageAccessDeniedException) {
-                return WidgetState.PermissionRequired
-            }
-
-            val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
-
-            WidgetState.Success(
-                promoName = forecast.promo.name,
-                simSlot = forecast.promo.simSlot,
-                remainingBytes = forecast.dataRemainingBytes,
-                totalAllowanceBytes = forecast.promo.totalAllowanceBytes,
-                pace = forecast.pace,
-                plainLanguageSummary = forecast.plainLanguageSummary,
-                isNoExpiry = forecast.promo.isNoExpiry,
-                lastUpdatedMillis = now
+            val useCase = getActiveBurnForecastUseCase ?: GetActiveBurnForecastUseCase(
+                promoRepository = promoRepository,
+                usageRepository = usageRepository,
+                burnRateEngine = burnRateEngine,
+                getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepository)
             )
+
+            when (val result = useCase.execute(activePromo, now)) {
+                is BurnForecastResult.PermissionRequired -> WidgetState.PermissionRequired
+                is BurnForecastResult.NoActivePromo -> WidgetState.NoActivePromo
+                is BurnForecastResult.Error -> WidgetState.Error(result.message)
+                is BurnForecastResult.Success -> {
+                    val forecast = result.forecast
+                    WidgetState.Success(
+                        promoName = forecast.promo.name,
+                        simSlot = forecast.promo.simSlot,
+                        remainingBytes = forecast.dataRemainingBytes,
+                        totalAllowanceBytes = forecast.promo.totalAllowanceBytes,
+                        pace = forecast.pace,
+                        plainLanguageSummary = forecast.plainLanguageSummary,
+                        isNoExpiry = forecast.promo.isNoExpiry,
+                        lastUpdatedMillis = now,
+                        estimatedDepletionTimestamp = forecast.estimatedDepletionTimestamp
+                    )
+                }
+            }
         } catch (e: Exception) {
             WidgetState.Error(e.localizedMessage ?: "Sync failed")
         }
@@ -66,9 +78,16 @@ object WidgetSyncHelper {
         promoRepository: PromoRepository,
         usageRepository: UsageRepository,
         burnRateEngine: BurnRateEngine = BurnRateEngine(),
+        getActiveBurnForecastUseCase: GetActiveBurnForecastUseCase? = null,
         now: Long = System.currentTimeMillis()
     ): WidgetState {
-        val state = computeWidgetState(promoRepository, usageRepository, burnRateEngine, now)
+        val state = computeWidgetState(
+            promoRepository = promoRepository,
+            usageRepository = usageRepository,
+            burnRateEngine = burnRateEngine,
+            getActiveBurnForecastUseCase = getActiveBurnForecastUseCase,
+            now = now
+        )
         WidgetStatePreferences.saveStateAndNotify(context, state)
         return state
     }

@@ -19,10 +19,10 @@ object WorkManagerScheduler {
     private const val ONE_TIME_WORK_NAME = "usage_sync_immediate"
 
     /**
-     * Enqueues the periodic 2-hour background sync job in compliance with battery constraints in SKILL.md.
+     * Enqueues the periodic 1-hour background sync job in compliance with battery constraints in SKILL.md.
      */
     fun schedulePeriodicSync(context: Context) {
-        val workRequest = PeriodicWorkRequestBuilder<UsageSyncWorker>(2, TimeUnit.HOURS)
+        val workRequest = PeriodicWorkRequestBuilder<UsageSyncWorker>(1, TimeUnit.HOURS)
             .setConstraints(
                 Constraints.Builder()
                     .build()
@@ -31,7 +31,7 @@ object WorkManagerScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             workRequest
         )
     }

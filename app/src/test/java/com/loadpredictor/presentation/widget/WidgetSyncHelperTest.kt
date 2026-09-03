@@ -145,5 +145,6 @@ class WidgetSyncHelperTest {
         assertEquals(expectedForecast.plainLanguageSummary, successState.plainLanguageSummary)
         assertEquals(expectedForecast.promo.isNoExpiry, successState.isNoExpiry)
         assertEquals(testNow, successState.lastUpdatedMillis)
+        assertEquals(expectedForecast.estimatedDepletionTimestamp, successState.estimatedDepletionTimestamp)
     }
 }

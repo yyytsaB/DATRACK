@@ -19,7 +19,8 @@ sealed interface WidgetState {
         val pace: BurnPace,
         val plainLanguageSummary: String,
         val isNoExpiry: Boolean,
-        val lastUpdatedMillis: Long
+        val lastUpdatedMillis: Long,
+        val estimatedDepletionTimestamp: Long? = null
     ) : WidgetState
 
     /**

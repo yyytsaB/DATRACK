@@ -99,24 +99,28 @@ class LoadPredictorWidget : GlanceAppWidget() {
             } else {
                 val networkStatsDataSource = NetworkStatsDataSource(context)
                 val usageRepo = UsageRepositoryImpl(usageHelper, networkStatsDataSource)
-                val burnRateEngine = BurnRateEngine()
-                val now = System.currentTimeMillis()
-                val rawUsageBytes = try {
-                    usageRepo.queryMobileUsageBytes(activePromo.startTimestamp, now)
-                } catch (e: Exception) {
-                    0L
-                }
-                val forecast = burnRateEngine.calculateForecast(activePromo, rawUsageBytes, now)
-                updateAppWidgetState(context, id) { prefs ->
-                    prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_SUCCESS
-                    prefs[WidgetStatePreferences.KEY_PROMO_NAME] = forecast.promo.name
-                    prefs[WidgetStatePreferences.KEY_SIM_SLOT] = forecast.promo.simSlot.name
-                    prefs[WidgetStatePreferences.KEY_REMAINING_BYTES] = forecast.dataRemainingBytes
-                    prefs[WidgetStatePreferences.KEY_TOTAL_ALLOWANCE_BYTES] = forecast.promo.totalAllowanceBytes
-                    prefs[WidgetStatePreferences.KEY_PACE] = forecast.pace.name
-                    prefs[WidgetStatePreferences.KEY_SUMMARY] = forecast.plainLanguageSummary
-                    prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] = forecast.promo.isNoExpiry
-                    prefs[WidgetStatePreferences.KEY_LAST_UPDATED] = now
+                val getDailyUsageBreakdownUseCase = com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo)
+                val getActiveBurnForecastUseCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(
+                    promoRepository = promoRepo,
+                    usageRepository = usageRepo,
+                    getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
+                )
+                val result = getActiveBurnForecastUseCase.execute(activePromo)
+                if (result is com.loadpredictor.domain.model.BurnForecastResult.Success) {
+                    val forecast = result.forecast
+                    val now = System.currentTimeMillis()
+                    updateAppWidgetState(context, id) { prefs ->
+                        prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_SUCCESS
+                        prefs[WidgetStatePreferences.KEY_PROMO_NAME] = forecast.promo.name
+                        prefs[WidgetStatePreferences.KEY_SIM_SLOT] = forecast.promo.simSlot.name
+                        prefs[WidgetStatePreferences.KEY_REMAINING_BYTES] = forecast.dataRemainingBytes
+                        prefs[WidgetStatePreferences.KEY_TOTAL_ALLOWANCE_BYTES] = forecast.promo.totalAllowanceBytes
+                        prefs[WidgetStatePreferences.KEY_PACE] = forecast.pace.name
+                        prefs[WidgetStatePreferences.KEY_SUMMARY] = forecast.plainLanguageSummary
+                        prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] = forecast.promo.isNoExpiry
+                        prefs[WidgetStatePreferences.KEY_LAST_UPDATED] = now
+                        prefs[WidgetStatePreferences.KEY_ESTIMATED_DEPLETION_TIMESTAMP] = forecast.estimatedDepletionTimestamp ?: -1L
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -319,7 +323,7 @@ private fun Success4x1Layout(state: WidgetState.Success) {
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
-                val etaSummary = state.plainLanguageSummary.ifBlank { paceLabel }
+                val etaSummary = formatWidgetDepletionEta(state, paceLabel)
                 Text(
                     text = etaSummary,
                     style = TextStyle(
@@ -332,6 +336,19 @@ private fun Success4x1Layout(state: WidgetState.Success) {
                 )
             }
         }
+    }
+}
+
+private fun formatWidgetDepletionEta(state: WidgetState.Success, paceLabel: String): String {
+    if (state.pace == BurnPace.DEPLETED) return "Depleted"
+    val depletionTime = state.estimatedDepletionTimestamp
+    if (depletionTime != null && depletionTime > System.currentTimeMillis()) {
+        return "Runs out ${DataFormatter.formatDepletionDateTime(depletionTime)}"
+    }
+    return if (state.pace == BurnPace.INSUFFICIENT_DATA) {
+        "Calibrating pace"
+    } else {
+        paceLabel
     }
 }
 

@@ -22,6 +22,7 @@ object WidgetStatePreferences {
     val KEY_SUMMARY = stringPreferencesKey("widget_summary")
     val KEY_IS_NO_EXPIRY = booleanPreferencesKey("widget_is_no_expiry")
     val KEY_LAST_UPDATED = longPreferencesKey("widget_last_updated")
+    val KEY_ESTIMATED_DEPLETION_TIMESTAMP = longPreferencesKey("widget_estimated_depletion_timestamp")
     val KEY_ERROR_MESSAGE = stringPreferencesKey("widget_error_message")
 
     const val TYPE_SUCCESS = "SUCCESS"
@@ -32,6 +33,8 @@ object WidgetStatePreferences {
     fun readState(preferences: Preferences): WidgetState {
         return when (preferences[KEY_STATE_TYPE]) {
             TYPE_SUCCESS -> {
+                val rawDepletionTime = preferences[KEY_ESTIMATED_DEPLETION_TIMESTAMP]
+                val estimatedDepletionTimestamp = if (rawDepletionTime != null && rawDepletionTime > 0L) rawDepletionTime else null
                 WidgetState.Success(
                     promoName = preferences[KEY_PROMO_NAME] ?: "Active Promo",
                     simSlot = if (preferences[KEY_SIM_SLOT] == "SIM_2") SimSlot.SIM_2 else SimSlot.SIM_1,
@@ -44,7 +47,8 @@ object WidgetStatePreferences {
                     },
                     plainLanguageSummary = preferences[KEY_SUMMARY] ?: "",
                     isNoExpiry = preferences[KEY_IS_NO_EXPIRY] ?: true,
-                    lastUpdatedMillis = preferences[KEY_LAST_UPDATED] ?: System.currentTimeMillis()
+                    lastUpdatedMillis = preferences[KEY_LAST_UPDATED] ?: System.currentTimeMillis(),
+                    estimatedDepletionTimestamp = estimatedDepletionTimestamp
                 )
             }
             TYPE_NO_ACTIVE_PROMO -> WidgetState.NoActivePromo
@@ -71,6 +75,7 @@ object WidgetStatePreferences {
                         preferences[KEY_SUMMARY] = state.plainLanguageSummary
                         preferences[KEY_IS_NO_EXPIRY] = state.isNoExpiry
                         preferences[KEY_LAST_UPDATED] = state.lastUpdatedMillis
+                        preferences[KEY_ESTIMATED_DEPLETION_TIMESTAMP] = state.estimatedDepletionTimestamp ?: -1L
                     }
                     is WidgetState.NoActivePromo -> {
                         preferences[KEY_STATE_TYPE] = TYPE_NO_ACTIVE_PROMO
