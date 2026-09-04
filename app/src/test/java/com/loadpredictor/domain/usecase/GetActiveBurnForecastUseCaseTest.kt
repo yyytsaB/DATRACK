@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -353,5 +355,128 @@ class GetActiveBurnForecastUseCaseTest {
 
         assertEquals(BurnPace.INSUFFICIENT_DATA, forecast.pace)
         assertEquals(0.0, forecast.burnRateBytesPerHour, 0.001)
+    }
+
+    @Test
+    fun `anchored_forecast_populates_interval_when_ge_5_days`() = runTest {
+        val current = 1_700_000_000_000L
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = current
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val todayStart = cal.timeInMillis
+
+        // 5 varied completed buckets
+        val dailyMegabytes = listOf(100L, 150L, 200L, 250L, 300L)
+        val completedBuckets = dailyMegabytes.mapIndexed { index, mb ->
+            val dayOffset = (5 - index).toLong()
+            UsageBucket(
+                todayStart - dayOffset * 86_400_000L,
+                todayStart - (dayOffset - 1) * 86_400_000L,
+                mb * 1024L * 1024L,
+                0L
+            )
+        }
+
+        val promo = Promo(
+            id = 1L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = current - 10 * 86_400_000L,
+            expirationTimestamp = null,
+            isActive = true
+        )
+
+        val promoRepo = FakePromoRepository(activePromo = promo)
+        val usageRepo = object : UsageRepository {
+            override fun hasUsageAccess(): Boolean = true
+            override suspend fun queryMobileUsageBytes(startTime: Long, endTime: Long): Long = 5L * 1024L * 1024L * 1024L
+            override suspend fun queryDailyUsageBreakdown(startTime: Long, endTime: Long): List<UsageBucket> = completedBuckets
+        }
+        val timeProvider = FakeTimeProvider(currentTime = current)
+        val dailyBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo, timeProvider)
+
+        val useCase = GetActiveBurnForecastUseCase(
+            promoRepository = promoRepo,
+            usageRepository = usageRepo,
+            burnRateEngine = BurnRateEngine(),
+            timeProvider = timeProvider,
+            getDailyUsageBreakdownUseCase = dailyBreakdownUseCase
+        )
+
+        val result = useCase.execute(promo)
+        assertTrue(result is BurnForecastResult.Success)
+        val forecast = (result as BurnForecastResult.Success).forecast
+
+        assertNotNull(forecast.depletionEarlyTimestamp)
+        assertNotNull(forecast.depletionLateTimestamp)
+        assertTrue(forecast.depletionEarlyTimestamp!! < forecast.estimatedDepletionTimestamp!!)
+        assertTrue(forecast.estimatedDepletionTimestamp!! < forecast.depletionLateTimestamp!!)
+    }
+
+    @Test
+    fun `anchored_forecast_no_interval_when_lt_5_days`() = runTest {
+        val current = 1_700_000_000_000L
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = current
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val todayStart = cal.timeInMillis
+
+        // 3 completed buckets (>= 3 for mean anchor, but < 5 for interval)
+        val dailyMegabytes = listOf(150L, 200L, 250L)
+        val completedBuckets = dailyMegabytes.mapIndexed { index, mb ->
+            val dayOffset = (3 - index).toLong()
+            UsageBucket(
+                todayStart - dayOffset * 86_400_000L,
+                todayStart - (dayOffset - 1) * 86_400_000L,
+                mb * 1024L * 1024L,
+                0L
+            )
+        }
+
+        val promo = Promo(
+            id = 1L,
+            name = "Smart Magic Data 399",
+            totalAllowanceBytes = 24L * 1024L * 1024L * 1024L,
+            startTimestamp = current - 5 * 86_400_000L,
+            expirationTimestamp = null,
+            isActive = true
+        )
+
+        val promoRepo = FakePromoRepository(activePromo = promo)
+        val usageRepo = object : UsageRepository {
+            override fun hasUsageAccess(): Boolean = true
+            override suspend fun queryMobileUsageBytes(startTime: Long, endTime: Long): Long = 5L * 1024L * 1024L * 1024L
+            override suspend fun queryDailyUsageBreakdown(startTime: Long, endTime: Long): List<UsageBucket> = completedBuckets
+        }
+        val timeProvider = FakeTimeProvider(currentTime = current)
+        val dailyBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo, timeProvider)
+
+        val useCase = GetActiveBurnForecastUseCase(
+            promoRepository = promoRepo,
+            usageRepository = usageRepo,
+            burnRateEngine = BurnRateEngine(),
+            timeProvider = timeProvider,
+            getDailyUsageBreakdownUseCase = dailyBreakdownUseCase
+        )
+
+        val result = useCase.execute(promo)
+        assertTrue(result is BurnForecastResult.Success)
+        val forecast = (result as BurnForecastResult.Success).forecast
+
+        // Daily mean IS anchored
+        val expectedRate = (200L * 1024L * 1024L).toDouble() / 24.0
+        assertEquals(expectedRate, forecast.burnRateBytesPerHour, 1.0)
+
+        // Interval is null because size (3) < MIN_INTERVAL_DAYS (5)
+        assertNull(forecast.depletionEarlyTimestamp)
+        assertNull(forecast.depletionLateTimestamp)
     }
 }

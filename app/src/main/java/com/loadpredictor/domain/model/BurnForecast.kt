@@ -15,6 +15,8 @@ package com.loadpredictor.domain.model
  * @property plainLanguageSummary Natural, localized plain-language forecast sentence.
  * @property isDepleted True if dataRemainingBytes is 0.
  * @property timeRemainingMillis Milliseconds until promo expiration, or null for non-expiring promos.
+ * @property depletionEarlyTimestamp Pessimistic depletion timestamp bound (+1σ burn rate), or null if insufficient history or suppressed.
+ * @property depletionLateTimestamp Optimistic depletion timestamp bound (-1σ burn rate, capped at expiry), or null if insufficient history or suppressed.
  */
 data class BurnForecast(
     val promo: Promo,
@@ -26,5 +28,7 @@ data class BurnForecast(
     val pace: BurnPace,
     val plainLanguageSummary: String,
     val isDepleted: Boolean,
-    val timeRemainingMillis: Long?
+    val timeRemainingMillis: Long?,
+    val depletionEarlyTimestamp: Long? = null,
+    val depletionLateTimestamp: Long? = null
 )

@@ -6,6 +6,7 @@ import com.loadpredictor.domain.model.BurnForecastResult
 import com.loadpredictor.domain.model.BurnPace
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.UsageAccessDeniedException
+import com.loadpredictor.domain.model.UsageBucket
 import com.loadpredictor.domain.repository.PromoRepository
 import com.loadpredictor.domain.repository.UsageRepository
 import com.loadpredictor.domain.time.DefaultTimeProvider
@@ -78,9 +79,12 @@ class GetActiveBurnForecastUseCase(
             // daily buckets. If anchoring is available (>= MIN_DAILY_ANCHOR_DAYS completed days), it
             // overrides the EMA-derived burnRateBytesPerHour in the user-facing BurnForecast to ensure
             // the "Daily avg" chip and "At this pace" chip are mathematically consistent.
+            // When >= MIN_INTERVAL_DAYS completed buckets exist, a confidence interval is also derived
+            // from the observed standard deviation.
             // The EMA path (lastActiveBurnRate, shouldPersistSyncState, updateSyncState) is unchanged.
+            val recentCompletedBuckets = getRecentCompletedDailyBuckets(activePromo, now)
             val anchoredForecast: BurnForecast = run {
-                val dailyMeanRate = computeSevenDayDailyMeanBytesPerHour(activePromo, now)
+                val dailyMeanRate = computeDailyMeanBytesPerHour(recentCompletedBuckets)
                 if (dailyMeanRate != null && dailyMeanRate > 0.0 &&
                     forecast.pace != BurnPace.INSUFFICIENT_DATA &&
                     forecast.pace != BurnPace.DEPLETED
@@ -88,35 +92,23 @@ class GetActiveBurnForecastUseCase(
                     val remainingHours = forecast.dataRemainingBytes.toDouble() / dailyMeanRate
                     val remainingMs = (remainingHours * 3_600_000.0).toLong()
                     val anchoredDepletionTime = now + remainingMs
+                    val intervalPair = computeDepletionInterval(
+                        buckets = recentCompletedBuckets,
+                        remainingBytes = forecast.dataRemainingBytes,
+                        now = now,
+                        promo = activePromo
+                    )
                     forecast.copy(
                         burnRateBytesPerHour = dailyMeanRate,
                         estimatedDepletionTimestamp = anchoredDepletionTime,
-                        plainLanguageSummary = buildAnchoredSummary(activePromo, anchoredDepletionTime, now)
+                        plainLanguageSummary = buildAnchoredSummary(activePromo, anchoredDepletionTime, now),
+                        depletionEarlyTimestamp = intervalPair?.first,
+                        depletionLateTimestamp = intervalPair?.second
                     )
                 } else {
                     forecast
                 }
             }
-
-            println(
-                """
-                [DATRACK_DIAG] === GetActiveBurnForecastUseCase.execute ===
-                promo.id: ${activePromo.id} (${activePromo.name})
-                promo.lastSyncDataUsedBytes (BEFORE): ${activePromo.lastSyncDataUsedBytes} (${activePromo.lastSyncDataUsedBytes / (1024 * 1024)} MB)
-                promo.lastSyncTimestamp (BEFORE): ${activePromo.lastSyncTimestamp}
-                currentLiveUsageBytes: $usedBytes (${usedBytes / (1024 * 1024)} MB)
-                deltaBytes: $deltaBytes (${deltaBytes / (1024 * 1024)} MB)
-                deltaTimeMs: $deltaTimeMs (${deltaTimeMs / (1000 * 60)} mins)
-                freshInstantaneousRate: ${"%.2f MB/hr".format(freshInstantaneousRate / (1024 * 1024))}
-                alpha: ${"%.4f".format(alpha)}
-                promo.lastActiveBurnRate (BEFORE): ${activePromo.lastActiveBurnRate?.let { "%.2f MB/hr".format(it / (1024 * 1024)) } ?: "null"}
-                effectiveRate (RESULT): ${"%.2f MB/hr".format(forecast.burnRateBytesPerHour / (1024 * 1024))}
-                anchoredRate: ${anchoredForecast.burnRateBytesPerHour.let { "%.2f MB/hr".format(it / (1024 * 1024)) }} (${if (anchoredForecast.burnRateBytesPerHour != forecast.burnRateBytesPerHour) "ANCHORED to daily mean" else "EMA path"})
-                dataRemainingBytes: ${forecast.dataRemainingBytes} (${"%.2f GB".format(forecast.dataRemainingBytes.toDouble() / (1024.0 * 1024.0 * 1024.0))})
-                estimatedDepletion: ${anchoredForecast.estimatedDepletionTimestamp?.let { java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(it)) } ?: "null"}
-                shouldPersistSyncState: $shouldPersistSyncState
-                """.trimIndent()
-            )
 
             if (shouldPersistSyncState && forecast.burnRateBytesPerHour > 0.0) {
                 promoRepository.updateSyncState(
@@ -137,24 +129,18 @@ class GetActiveBurnForecastUseCase(
     }
 
     /**
-     * Computes a 7-day rolling daily mean burn rate in bytes/hour from completed daily buckets.
-     *
-     * Returns null if:
-     * - [getDailyUsageBreakdownUseCase] is not injected, or
-     * - fewer than [MIN_DAILY_ANCHOR_DAYS] completed buckets exist.
-     *
+     * Extracts up to [DAILY_ANCHOR_WINDOW_DAYS] most recent completed daily buckets.
      * "Completed" means the bucket's date is strictly before today's calendar date (no partial today).
-     * The most recent [DAILY_ANCHOR_WINDOW_DAYS] completed buckets are averaged.
      */
-    private suspend fun computeSevenDayDailyMeanBytesPerHour(
+    private suspend fun getRecentCompletedDailyBuckets(
         promo: Promo,
         currentTime: Long
-    ): Double? {
-        val useCase = getDailyUsageBreakdownUseCase ?: return null
+    ): List<UsageBucket> {
+        val useCase = getDailyUsageBreakdownUseCase ?: return emptyList()
         val buckets = try {
             useCase(promo, currentTime)
         } catch (e: Exception) {
-            return null
+            return emptyList()
         }
         val todayStartMs = run {
             val cal = Calendar.getInstance()
@@ -166,10 +152,64 @@ class GetActiveBurnForecastUseCase(
             cal.timeInMillis
         }
         val completedBuckets = buckets.filter { it.startTimestamp < todayStartMs && it.totalBytes >= 0L }
-        if (completedBuckets.size < MIN_DAILY_ANCHOR_DAYS) return null
-        val recentCompletedBuckets = completedBuckets.takeLast(DAILY_ANCHOR_WINDOW_DAYS)
-        val meanBytesPerDay = recentCompletedBuckets.map { it.totalBytes }.average()
+        return completedBuckets.takeLast(DAILY_ANCHOR_WINDOW_DAYS)
+    }
+
+    /**
+     * Computes a 7-day rolling daily mean burn rate in bytes/hour from completed daily buckets.
+     *
+     * Returns null if fewer than [MIN_DAILY_ANCHOR_DAYS] completed buckets exist.
+     */
+    internal fun computeDailyMeanBytesPerHour(buckets: List<UsageBucket>): Double? {
+        if (buckets.size < MIN_DAILY_ANCHOR_DAYS) return null
+        val meanBytesPerDay = buckets.map { it.totalBytes }.average()
         return meanBytesPerDay / 24.0 // bytes/day -> bytes/hour
+    }
+
+    /**
+     * Computes the depletion confidence interval [Pair] of (earlyTs, lateTs) using sample standard deviation.
+     *
+     * Returns null if:
+     * - fewer than [MIN_INTERVAL_DAYS] completed buckets exist
+     * - [remainingBytes] <= 0
+     * - late rate <= 0 (i.e. σ >= μ, high variance/noise)
+     * - half-spread in whole days <= 0
+     */
+    internal fun computeDepletionInterval(
+        buckets: List<UsageBucket>,
+        remainingBytes: Long,
+        now: Long,
+        promo: Promo
+    ): Pair<Long, Long>? {
+        if (buckets.size < MIN_INTERVAL_DAYS || remainingBytes <= 0L) return null
+
+        val bytesList = buckets.map { it.totalBytes.toDouble() }
+        val n = bytesList.size
+        val mean = bytesList.average()
+        if (mean <= 0.0) return null
+
+        val variance = bytesList.sumOf { (it - mean) * (it - mean) } / (n - 1)
+        val stdDev = kotlin.math.sqrt(variance)
+
+        val earlyRate = (mean + stdDev) / 24.0
+        val lateRate = (mean - stdDev) / 24.0
+
+        if (lateRate <= 0.0) return null
+
+        val earlyHours = remainingBytes.toDouble() / earlyRate
+        val lateHours = remainingBytes.toDouble() / lateRate
+
+        val earlyTs = now + (earlyHours * 3_600_000.0).toLong()
+        var lateTs = now + (lateHours * 3_600_000.0).toLong()
+
+        if (promo.expirationTimestamp != null) {
+            lateTs = minOf(lateTs, promo.expirationTimestamp)
+        }
+
+        val halfSpreadDays = kotlin.math.round((lateTs - earlyTs) / 86_400_000.0 / 2.0).toInt()
+        if (halfSpreadDays <= 0) return null
+
+        return Pair(earlyTs, lateTs)
     }
 
     private fun buildAnchoredSummary(
@@ -200,7 +240,10 @@ class GetActiveBurnForecastUseCase(
         /** Minimum number of completed daily buckets required to anchor the forecast to the daily mean. */
         const val MIN_DAILY_ANCHOR_DAYS = 3
 
-        /** Maximum number of most-recent completed daily buckets used to compute the daily mean. */
+        /** Minimum completed daily buckets required to compute a confidence interval. */
+        const val MIN_INTERVAL_DAYS = 5
+
+        /** Maximum number of most-recent completed daily buckets used to compute the daily mean and interval. */
         const val DAILY_ANCHOR_WINDOW_DAYS = 7
     }
 }

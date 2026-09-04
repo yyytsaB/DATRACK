@@ -3,9 +3,12 @@ package com.loadpredictor.presentation.dashboard
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -76,8 +79,17 @@ fun DashboardStatChips(
         }
     }
 
+    val halfSpread = computeHalfSpreadDays(forecast)
+    val paceSubLabel = if (halfSpread != null && forecast.pace != BurnPace.INSUFFICIENT_DATA && forecast.pace != BurnPace.DEPLETED) {
+        "± $halfSpread ${if (halfSpread == 1) "day" else "days"}"
+    } else {
+        null
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         StatChip(
@@ -93,7 +105,8 @@ fun DashboardStatChips(
         StatChip(
             value = paceValue,
             label = paceLabel,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            subLabel = paceSubLabel
         )
     }
 }
@@ -102,10 +115,11 @@ fun DashboardStatChips(
 private fun StatChip(
     value: String,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subLabel: String? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.fillMaxHeight(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF141824)),
         border = BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFF222B3D))
@@ -113,7 +127,7 @@ private fun StatChip(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp, horizontal = 6.dp),
+                .padding(vertical = 14.dp, horizontal = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -136,6 +150,24 @@ private fun StatChip(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
+            if (subLabel != null) {
+                Spacer(modifier = Modifier.padding(top = 2.dp))
+                Text(
+                    text = subLabel,
+                    fontSize = 11.sp,
+                    color = androidx.compose.ui.graphics.Color(0xFF8E99A8).copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
+}
+
+private fun computeHalfSpreadDays(forecast: BurnForecast): Int? {
+    val early = forecast.depletionEarlyTimestamp ?: return null
+    val late = forecast.depletionLateTimestamp ?: return null
+    val spreadDays = kotlin.math.round((late - early) / 86_400_000.0 / 2.0).toInt()
+    return if (spreadDays > 0) spreadDays else null
 }

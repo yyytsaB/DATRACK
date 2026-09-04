@@ -118,8 +118,8 @@ tool is only trustworthy if it's honest about what it can't measure precisely:
 ## Current Status
 
 Built and verified on physical hardware (SM-A226B, Android 13) against an
-active Smart Communications prepaid SIM. Test suite: **112 JVM unit tests**
-across 16 test classes, **12 on-device instrumented tests**.
+active Smart Communications prepaid SIM. Test suite: **127 JVM unit tests**
+across 17 test classes, **12 on-device instrumented tests**.
 
 ### v1 MVP & Enhancements ✅ (Complete)
 
@@ -177,10 +177,11 @@ ordered by impact and implementation viability.
 
 #### High Priority
 
-- [ ] **Confidence interval display** — instead of a single depletion timestamp,
-      show a range ("runs out between Wed 2 PM – Thu 8 AM") based on observed
-      usage variance over recent days. `BurnForecast` already captures the raw
-      data; this is a presentation and engine enhancement.
+- [x] **Confidence interval display** — displays uncertainty as a `± N days` sub-label
+      inside the "At this pace" chip on the Dashboard, derived from the sample standard
+      deviation (±1σ) of up to 7 completed daily usage buckets. Requires ≥ 5 completed
+      calendar days of history, and is suppressed if σ ≥ μ (high noise / bursty traffic)
+      or if the half-spread rounds to ≤ 0 days. Late bound is capped at promo expiration.
 - [x] **Weekday vs. weekend usage pattern awareness** — standalone read-only
       pattern callout in the History tab ("You use ~2.9x more data on weekdays...")
       computed strictly from completed daily buckets (excluding today's partial
