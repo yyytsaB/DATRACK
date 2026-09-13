@@ -311,8 +311,10 @@ fun DashboardView(
                 is BurnForecastResult.Success -> {
                     LiveForecastHeroSection(
                         forecast = forecastResult.forecast,
-                        dailyAvgBytes = uiState.dailyUsageBreakdown.let { list ->
-                            if (list.isEmpty()) 0L else list.map { it.totalBytes }.average().toLong()
+                        dailyAvgBytes = if (forecastResult.forecast.burnRateBytesPerHour > 0.0) {
+                            kotlin.math.round(forecastResult.forecast.burnRateBytesPerHour * 24.0).toLong()
+                        } else {
+                            0L
                         }
                     )
 
