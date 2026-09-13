@@ -196,7 +196,7 @@ ordered by impact and implementation viability.
       mathematically consistent by construction.
 - [x] **Promo editing workflow** — promos can be edited in-place with instant
       recalibration and preserved delta tracking baselines.
-- [ ] **Projected depletion mini-chart on the home screen widget** — render a
+- [x] **Projected depletion mini-chart on the home screen widget** — render a
       small curve showing the projected usage trajectory alongside remaining data
       (🟢 will last / 🟡 cutting it close / 🔴 will run out early). The Glance
       widget pipeline and data are already in place; this is a layout and
