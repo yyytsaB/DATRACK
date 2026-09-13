@@ -146,5 +146,12 @@ class WidgetSyncHelperTest {
         assertEquals(expectedForecast.promo.isNoExpiry, successState.isNoExpiry)
         assertEquals(testNow, successState.lastUpdatedMillis)
         assertEquals(expectedForecast.estimatedDepletionTimestamp, successState.estimatedDepletionTimestamp)
+        val expectedDailyBurnRate = if (expectedForecast.burnRateBytesPerHour > 0.0) {
+            kotlin.math.round(expectedForecast.burnRateBytesPerHour * 24.0).toLong()
+        } else {
+            0L
+        }
+        assertEquals(expectedDailyBurnRate, successState.dailyBurnRateBytes)
+        assertEquals(expectedForecast.promo.expirationTimestamp, successState.expirationTimestamp)
     }
 }

@@ -61,7 +61,13 @@ object WidgetSyncHelper {
                         plainLanguageSummary = forecast.plainLanguageSummary,
                         isNoExpiry = forecast.promo.isNoExpiry,
                         lastUpdatedMillis = now,
-                        estimatedDepletionTimestamp = forecast.estimatedDepletionTimestamp
+                        estimatedDepletionTimestamp = forecast.estimatedDepletionTimestamp,
+                        dailyBurnRateBytes = if (forecast.burnRateBytesPerHour > 0.0) {
+                            kotlin.math.round(forecast.burnRateBytesPerHour * 24.0).toLong()
+                        } else {
+                            0L
+                        },
+                        expirationTimestamp = forecast.promo.expirationTimestamp
                     )
                 }
             }

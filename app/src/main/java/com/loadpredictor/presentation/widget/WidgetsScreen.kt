@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -511,34 +512,40 @@ private fun WideWidgetPreviewCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Right Column: Progress bar + ETA
+            // Right Column: Sparkline + ETA
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
-                val progressColor = com.loadpredictor.presentation.theme.getDataProgressColor(remainingFraction)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(linearTrackColor)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(remainingFraction)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(progressColor)
+                val dailyBurnRate = if (forecast.burnRateBytesPerHour > 0.0) {
+                    kotlin.math.round(forecast.burnRateBytesPerHour * 24.0).toLong()
+                } else {
+                    0L
+                }
+                val sparklineBitmap = remember(forecast) {
+                    renderGlanceSparklineBitmap(
+                        remainingBytes = forecast.dataRemainingBytes,
+                        totalAllowanceBytes = forecast.promo.totalAllowanceBytes,
+                        dailyBurnRateBytes = dailyBurnRate,
+                        estimatedDepletionTimestamp = forecast.estimatedDepletionTimestamp,
+                        expirationTimestamp = forecast.promo.expirationTimestamp,
+                        pace = forecast.pace
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                androidx.compose.foundation.Image(
+                    bitmap = sparklineBitmap.asImageBitmap(),
+                    contentDescription = "Projected depletion curve",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = etaText,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
                     color = paceColor,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     maxLines = 1
                 )
             }

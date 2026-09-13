@@ -31,9 +31,27 @@ data class HistoryUiState(
 
     /**
      * Average daily data consumption across available buckets in the selected range.
+     * Excludes today's in-progress partial bucket when completed day buckets exist,
+     * maintaining consistency with the forecast engine and dashboard.
      */
     val dailyAverageBytes: Long
-        get() = if (dailyBuckets.isEmpty()) 0L else (dailyBuckets.map { it.totalBytes }.average()).toLong()
+        get() = computeDailyAverage(System.currentTimeMillis())
+
+    fun computeDailyAverage(now: Long): Long {
+        if (dailyBuckets.isEmpty()) return 0L
+        val todayStartMs = run {
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = now
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            cal.timeInMillis
+        }
+        val completedBuckets = dailyBuckets.filter { it.startTimestamp < todayStartMs && it.totalBytes >= 0L }
+        val targetBuckets = if (completedBuckets.isNotEmpty()) completedBuckets else dailyBuckets
+        return (targetBuckets.map { it.totalBytes }.average()).toLong()
+    }
 
     /**
      * The single highest consumption bucket in the selected range.

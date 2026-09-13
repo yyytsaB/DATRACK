@@ -196,4 +196,25 @@ class HistoryViewModelTest {
 
         assertEquals(com.loadpredictor.domain.model.UsagePatternInsight.InsufficientData, viewModel.uiState.value.patternInsight)
     }
+
+    @Test
+    fun `computeDailyAverage excludes today partial bucket when completed buckets exist`() {
+        val now = 1_700_000_000_000L
+        val todayMidnight = run {
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = now
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            cal.timeInMillis
+        }
+        val day1 = UsageBucket(todayMidnight - (2 * 86_400_000L), todayMidnight - 86_400_000L, 250_000_000L, 13_800_000L) // 263.8 MB
+        val day2 = UsageBucket(todayMidnight - 86_400_000L, todayMidnight, 250_000_000L, 13_800_000L) // 263.8 MB
+        val todayPartial = UsageBucket(todayMidnight, now, 10_000_000L, 0L) // 10 MB partial today
+
+        val state = HistoryUiState(dailyBuckets = listOf(day1, day2, todayPartial))
+        // Average should be based on day1 and day2 (263.8 MB), not diluted by today's partial bucket
+        assertEquals(263_800_000L, state.computeDailyAverage(now))
+    }
 }

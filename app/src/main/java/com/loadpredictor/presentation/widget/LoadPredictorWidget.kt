@@ -3,8 +3,13 @@ package com.loadpredictor.presentation.widget
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.RectF
+import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
@@ -120,6 +125,12 @@ class LoadPredictorWidget : GlanceAppWidget() {
                         prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] = forecast.promo.isNoExpiry
                         prefs[WidgetStatePreferences.KEY_LAST_UPDATED] = now
                         prefs[WidgetStatePreferences.KEY_ESTIMATED_DEPLETION_TIMESTAMP] = forecast.estimatedDepletionTimestamp ?: -1L
+                        prefs[WidgetStatePreferences.KEY_DAILY_BURN_RATE_BYTES] = if (forecast.burnRateBytesPerHour > 0.0) {
+                            kotlin.math.round(forecast.burnRateBytesPerHour * 24.0).toLong()
+                        } else {
+                            0L
+                        }
+                        prefs[WidgetStatePreferences.KEY_EXPIRATION_TIMESTAMP] = forecast.promo.expirationTimestamp ?: -1L
                     }
                 }
             }
@@ -307,18 +318,25 @@ private fun Success4x1Layout(state: WidgetState.Success) {
 
         Spacer(modifier = GlanceModifier.width(12.dp))
 
-        // Right Column: Linear Progress Bar + ETA / Pace Status
+        // Right Column: Projected Depletion Sparkline + ETA / Pace Status
         Column(
             modifier = GlanceModifier.defaultWeight(),
             verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
-            LinearProgressIndicator(
-                progress = remainingFraction,
-                modifier = GlanceModifier.fillMaxWidth().height(6.dp),
-                color = ColorProvider(progressColor),
-                backgroundColor = ColorProvider(Color(0xFF252D3D))
+            val sparklineBitmap = renderGlanceSparklineBitmap(
+                remainingBytes = state.remainingBytes,
+                totalAllowanceBytes = state.totalAllowanceBytes,
+                dailyBurnRateBytes = state.dailyBurnRateBytes,
+                estimatedDepletionTimestamp = state.estimatedDepletionTimestamp,
+                expirationTimestamp = state.expirationTimestamp,
+                pace = state.pace
             )
-            Spacer(modifier = GlanceModifier.height(4.dp))
+            Image(
+                provider = ImageProvider(sparklineBitmap),
+                contentDescription = "Projected depletion curve",
+                modifier = GlanceModifier.fillMaxWidth().height(20.dp)
+            )
+            Spacer(modifier = GlanceModifier.height(2.dp))
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Vertical.CenterVertically
@@ -577,4 +595,142 @@ private fun getGlancePaceLabel(pace: BurnPace, isNoExpiry: Boolean): String {
             BurnPace.INSUFFICIENT_DATA -> "Calibrating"
         }
     }
+}
+
+internal fun renderGlanceSparklineBitmap(
+    remainingBytes: Long,
+    totalAllowanceBytes: Long,
+    dailyBurnRateBytes: Long,
+    estimatedDepletionTimestamp: Long?,
+    expirationTimestamp: Long?,
+    pace: BurnPace,
+    now: Long = System.currentTimeMillis()
+): Bitmap {
+    val width = 240
+    val height = 48
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val strokeWidth = 3f
+    val padX = 4f
+    val padTop = 6f
+    val padBottom = 6f
+    val drawWidth = width - 2 * padX
+    val drawHeight = height - padTop - padBottom
+
+    // Faint baseline floor
+    val baseLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        this.strokeWidth = 1.5f
+        color = 0xFF232B3D.toInt()
+    }
+    val groundY = height - padBottom
+    canvas.drawLine(padX, groundY, width - padX, groundY, baseLinePaint)
+
+    val paceColor = when (pace) {
+        BurnPace.ON_TRACK, BurnPace.CONSERVATIVE -> 0xFF00F5D4.toInt() // 🟢 Mint
+        BurnPace.BURNING_FAST -> 0xFFFACC15.toInt() // 🟡 Amber
+        BurnPace.DEPLETED -> 0xFFFF4D4D.toInt() // 🔴 Red
+        BurnPace.INSUFFICIENT_DATA -> 0xFF94A3B8.toInt() // ⚪ Slate
+    }
+
+    if (pace == BurnPace.DEPLETED || remainingBytes <= 0L) {
+        // Flat red line at ground
+        val flatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            this.strokeWidth = strokeWidth
+            strokeCap = Paint.Cap.ROUND
+            color = paceColor
+        }
+        canvas.drawLine(padX, groundY, width - padX, groundY, flatPaint)
+        return bitmap
+    }
+
+    val totalAllowance = maxOf(1L, totalAllowanceBytes).toDouble()
+    val initialFraction = (remainingBytes.toDouble() / totalAllowance).coerceIn(0.0, 1.0)
+    val initialY = (padTop + (1.0 - initialFraction) * drawHeight).toFloat()
+
+    if (pace == BurnPace.INSUFFICIENT_DATA || dailyBurnRateBytes <= 0L || estimatedDepletionTimestamp == null) {
+        // Neutral dashed line at current balance
+        val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            this.strokeWidth = strokeWidth
+            strokeCap = Paint.Cap.ROUND
+            color = paceColor
+            pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
+        }
+        canvas.drawLine(padX, initialY, width - padX, initialY, dashPaint)
+        return bitmap
+    }
+
+    // Determine horizon
+    val msUntilDepletion = maxOf(0L, estimatedDepletionTimestamp - now)
+    val daysUntilDepletion = msUntilDepletion.toDouble() / 86_400_000.0
+
+    val horizonDays = if (expirationTimestamp != null && expirationTimestamp > now) {
+        maxOf(0.5, (expirationTimestamp - now).toDouble() / 86_400_000.0)
+    } else {
+        // Non-expiring promo: display up to 14 days lookahead or until depletion
+        daysUntilDepletion.coerceIn(0.5, 14.0)
+    }
+
+    val numPoints = 8
+    val points = mutableListOf<PointF>()
+    for (i in 0..numPoints) {
+        val frac = i.toDouble() / numPoints.toDouble()
+        val dayOffset = frac * horizonDays
+        val projectedRemaining = maxOf(0.0, remainingBytes.toDouble() - dayOffset * dailyBurnRateBytes.toDouble())
+        val remainingRatio = (projectedRemaining / totalAllowance).coerceIn(0.0, 1.0)
+
+        val x = (padX + frac * drawWidth).toFloat()
+        val y = (padTop + (1.0 - remainingRatio) * drawHeight).toFloat()
+        points.add(PointF(x, y))
+    }
+
+    // Build stroke path
+    val strokePath = Path()
+    strokePath.moveTo(points.first().x, points.first().y)
+    for (i in 1 until points.size) {
+        val prev = points[i - 1]
+        val curr = points[i]
+        val midX = (prev.x + curr.x) / 2f
+        val midY = (prev.y + curr.y) / 2f
+        strokePath.quadTo(prev.x, prev.y, midX, midY)
+    }
+    strokePath.lineTo(points.last().x, points.last().y)
+
+    // Build fill path
+    val fillPath = Path(strokePath)
+    fillPath.lineTo(points.last().x, groundY)
+    fillPath.lineTo(points.first().x, groundY)
+    fillPath.close()
+
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        shader = LinearGradient(
+            0f, padTop,
+            0f, groundY,
+            paceColor and 0x00FFFFFF or (0x44 shl 24), // 27% alpha at top
+            paceColor and 0x00FFFFFF or (0x00 shl 24), // 0% alpha at bottom
+            Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawPath(fillPath, fillPaint)
+
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+        strokeCap = Paint.Cap.ROUND
+        color = paceColor
+    }
+    canvas.drawPath(strokePath, strokePaint)
+
+    // Start dot
+    val startDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = paceColor
+    }
+    canvas.drawCircle(points.first().x, points.first().y, 3.5f, startDotPaint)
+
+    return bitmap
 }

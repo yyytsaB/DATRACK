@@ -45,6 +45,8 @@ class WidgetStatePreferencesTest {
     fun readState_returnsSuccess_withEstimatedDepletionTimestamp() {
         val now = 1700000000000L
         val depletionTime = 1705000000000L
+        val expiryTime = 1706000000000L
+        val dailyRate = 300_000_000L
         val prefs = mockk<Preferences>()
         every { prefs[WidgetStatePreferences.KEY_STATE_TYPE] } returns WidgetStatePreferences.TYPE_SUCCESS
         every { prefs[WidgetStatePreferences.KEY_PROMO_NAME] } returns "Smart Magic Data 399"
@@ -56,6 +58,8 @@ class WidgetStatePreferencesTest {
         every { prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] } returns true
         every { prefs[WidgetStatePreferences.KEY_LAST_UPDATED] } returns now
         every { prefs[WidgetStatePreferences.KEY_ESTIMATED_DEPLETION_TIMESTAMP] } returns depletionTime
+        every { prefs[WidgetStatePreferences.KEY_DAILY_BURN_RATE_BYTES] } returns dailyRate
+        every { prefs[WidgetStatePreferences.KEY_EXPIRATION_TIMESTAMP] } returns expiryTime
 
         val result = WidgetStatePreferences.readState(prefs)
         assertTrue(result is WidgetState.Success)
@@ -69,6 +73,8 @@ class WidgetStatePreferencesTest {
         assertEquals(true, success.isNoExpiry)
         assertEquals(now, success.lastUpdatedMillis)
         assertEquals(depletionTime, success.estimatedDepletionTimestamp)
+        assertEquals(dailyRate, success.dailyBurnRateBytes)
+        assertEquals(expiryTime, success.expirationTimestamp)
     }
 
     @Test
@@ -84,10 +90,14 @@ class WidgetStatePreferencesTest {
         every { prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] } returns false
         every { prefs[WidgetStatePreferences.KEY_LAST_UPDATED] } returns 1700000000000L
         every { prefs[WidgetStatePreferences.KEY_ESTIMATED_DEPLETION_TIMESTAMP] } returns -1L
+        every { prefs[WidgetStatePreferences.KEY_DAILY_BURN_RATE_BYTES] } returns null
+        every { prefs[WidgetStatePreferences.KEY_EXPIRATION_TIMESTAMP] } returns -1L
 
         val result = WidgetStatePreferences.readState(prefs)
         assertTrue(result is WidgetState.Success)
         val success = result as WidgetState.Success
         assertNull(success.estimatedDepletionTimestamp)
+        assertEquals(0L, success.dailyBurnRateBytes)
+        assertNull(success.expirationTimestamp)
     }
 }

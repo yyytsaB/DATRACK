@@ -20,7 +20,9 @@ sealed interface WidgetState {
         val plainLanguageSummary: String,
         val isNoExpiry: Boolean,
         val lastUpdatedMillis: Long,
-        val estimatedDepletionTimestamp: Long? = null
+        val estimatedDepletionTimestamp: Long? = null,
+        val dailyBurnRateBytes: Long = 0L,
+        val expirationTimestamp: Long? = null
     ) : WidgetState
 
     /**
