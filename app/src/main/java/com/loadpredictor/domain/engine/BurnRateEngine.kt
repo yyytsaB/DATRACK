@@ -113,11 +113,8 @@ class BurnRateEngine {
     ): BurnForecast {
         val elapsedTimeMs = maxOf(0L, currentTime - promo.startTimestamp)
         val measuredLiveUsageBytes = maxOf(0L, dataUsedBytesRaw)
-        val dataUsedBytes = minOf(
-            promo.totalAllowanceBytes,
-            maxOf(0L, promo.initialUsageOffsetBytes + measuredLiveUsageBytes)
-        )
-        val dataRemainingBytes = maxOf(0L, promo.totalAllowanceBytes - dataUsedBytes)
+        val dataRemainingBytes = promo.remainingBytes(measuredLiveUsageBytes)
+        val dataUsedBytes = promo.totalAllowanceBytes - dataRemainingBytes
         val isDepleted = (dataRemainingBytes == 0L)
 
         val timeRemainingMillis: Long? = promo.expirationTimestamp?.let { exp ->
@@ -172,7 +169,12 @@ class BurnRateEngine {
         val pace: BurnPace
         val plainLanguageSummary: String
 
-        if (isDepleted) {
+        if (promo.isExpired(currentTime)) {
+            pace = BurnPace.EXPIRED
+            estimatedDepletionTimestamp = null
+            burnStatusIndex = null
+            plainLanguageSummary = "${promo.name} has expired. Unused data is no longer available."
+        } else if (isDepleted) {
             // Case 1: Promo is completely depleted
             pace = BurnPace.DEPLETED
             estimatedDepletionTimestamp = currentTime
@@ -246,7 +248,8 @@ class BurnRateEngine {
             pace = pace,
             plainLanguageSummary = plainLanguageSummary,
             isDepleted = isDepleted,
-            timeRemainingMillis = timeRemainingMillis
+            timeRemainingMillis = timeRemainingMillis,
+            observedAt = currentTime
         )
     }
 

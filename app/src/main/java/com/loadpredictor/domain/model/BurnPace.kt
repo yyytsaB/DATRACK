@@ -26,6 +26,9 @@ enum class BurnPace {
      */
     DEPLETED,
 
+    /** The validity window has ended; unused allowance is no longer usable. */
+    EXPIRED,
+
     /**
      * Promo is in the first hour of usage (T_elapsed < 1 hr) or no usage detected yet (R_burn == 0).
      * Pacing is calibrating to prevent burst noise distortion.

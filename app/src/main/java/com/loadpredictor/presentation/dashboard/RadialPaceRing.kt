@@ -49,7 +49,7 @@ fun RadialPaceRing(
     strokeWidth: Dp = 15.dp
 ) {
     val targetProgress = when (pace) {
-        BurnPace.DEPLETED -> 0f
+        BurnPace.EXPIRED, BurnPace.DEPLETED -> 0f
         else -> remainingRatio.coerceIn(0f, 1f)
     }
 

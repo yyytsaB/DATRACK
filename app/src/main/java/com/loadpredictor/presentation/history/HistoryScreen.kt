@@ -1,163 +1,57 @@
 package com.loadpredictor.presentation.history
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.loadpredictor.presentation.theme.DarkBackground
-import com.loadpredictor.presentation.theme.MintPrimary
-import com.loadpredictor.presentation.theme.TextHighEmphasis
-import com.loadpredictor.presentation.theme.TextMediumEmphasis
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.loadpredictor.domain.model.*
+import com.loadpredictor.util.DataFormatter
 
-/**
- * Screen presenting device mobile data consumption history.
- *
- * Implements the reference-inspired frameless visual direction:
- * - Exactly ONE framed container (the Chart)
- * - Plain typography header & inline stats
- * - Tab-style range selector
- * - Frameless daily breakdown list
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun HistoryScreen(
-    viewModel: HistoryViewModel,
-    modifier: Modifier = Modifier
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    Scaffold(
-        containerColor = DarkBackground,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Usage History",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextHighEmphasis
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = TextHighEmphasis
-                )
-            )
-        }
-    ) { innerPadding ->
-        if (uiState.isLoading && uiState.dailyBuckets.isEmpty()) {
-            Box(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MintPrimary)
+fun HistoryScreen(viewModel: HistoryViewModel, modifier: Modifier = Modifier) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    Scaffold(topBar = { TopAppBar(title = { Text("Usage history") }) }) { padding ->
+        LazyColumn(modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                Text(state.activePromo?.name ?: "No active promo", style = MaterialTheme.typography.headlineSmall)
+                Text("Measured mobile usage only. Starting balance corrections are not daily traffic.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        } else {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 1. Context Title, Inline Stats, and Time-Range Selector
-                val promoTitle = uiState.activePromo?.name ?: "All Mobile Data"
-                val dateRangeStr = if (uiState.dailyBuckets.isNotEmpty()) {
-                    com.loadpredictor.util.DataFormatter.formatDateRange(
-                        startTimestamp = uiState.dailyBuckets.first().startTimestamp,
-                        endTimestamp = uiState.dailyBuckets.last().startTimestamp
-                    )
-                } else {
-                    "Recent"
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HistoryTimeRange.entries.forEach { range -> FilterChip(selected = range == state.selectedRange,
+                        onClick = { viewModel.setTimeRange(range) }, label = { Text(when(range) {
+                            HistoryTimeRange.LAST_7_DAYS -> "7 days"
+                            HistoryTimeRange.LAST_30_DAYS -> "30 days"
+                            HistoryTimeRange.LIFETIME -> "Up to 90 days"
+                        }) }) }
                 }
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "$promoTitle • $dateRangeStr",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextHighEmphasis
-                    )
-
-                    // Plain inline typography stats (Daily Avg, Total, Peak)
-                    val peakBucket = uiState.peakDayBucket
-                    HistoryMetricsRow(
-                        totalBurntBytes = uiState.totalBurntBytes,
-                        dailyAverageBytes = uiState.dailyAverageBytes,
-                        peakDayBytes = peakBucket?.totalBytes ?: 0L,
-                        peakDayTimestamp = peakBucket?.startTimestamp
-                    )
-
-                    // Tab-Style Time-Range Selector (7D, 30D, Lifetime)
-                    HistoryTimeRangePills(
-                        selectedRange = uiState.selectedRange,
-                        onRangeSelected = { viewModel.setTimeRange(it) }
-                    )
+            }
+            state.errorMessage?.let { message -> item {
+                Text(message, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { viewModel.refresh() }) { Text("Try again") }
+            } }
+            item {
+                Text("${DataFormatter.formatBytes(state.totalBurntBytes)} measured", style = MaterialTheme.typography.headlineMedium)
+                Text("${DataFormatter.formatBytes(state.dailyAverageBytes)} per completed day", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (state.patternInsight is UsagePatternInsight.Pattern) item { Text((state.patternInsight as UsagePatternInsight.Pattern).summary) }
+            item { InteractiveUsageChart(state.dailyBuckets, state.selectedBucketTimestamp, { viewModel.selectBucket(it) }) }
+            item { Text("Daily breakdown", style = MaterialTheme.typography.titleLarge) }
+            if (state.dailyBuckets.isEmpty()) item { Text(if (state.isLoading) "Loading usage…" else "No readings yet. Check Usage Access and your active promo.") }
+            items(state.dailyBuckets.reversed(), key = { it.startTimestamp }) { bucket ->
+                Column(Modifier.fillMaxWidth().clickable { viewModel.selectBucket(bucket.startTimestamp) }.padding(vertical = 12.dp)) {
+                    Text(DataFormatter.formatDate(bucket.startTimestamp), style = MaterialTheme.typography.titleMedium)
+                    Text(DataFormatter.formatBytes(bucket.totalBytes), color = MaterialTheme.colorScheme.primary)
+                    if (!bucket.isCompletedDay(System.currentTimeMillis())) Text("Partial day", style = MaterialTheme.typography.bodySmall)
                 }
-
-                // 2. Behavioral Usage Pattern Banner (automatically stays hidden if InsufficientData)
-                UsagePatternBanner(patternInsight = uiState.patternInsight)
-
-                // 3. Interactive Bar Chart (The single boxed container on this screen)
-                InteractiveUsageChart(
-                    buckets = uiState.dailyBuckets,
-                    selectedBucketTimestamp = uiState.selectedBucketTimestamp,
-                    onSelectBucketTimestamp = { viewModel.selectBucket(it) }
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 4. Frameless Daily Breakdown List
-                DailyBreakdownList(
-                    buckets = uiState.dailyBuckets,
-                    selectedBucketTimestamp = uiState.selectedBucketTimestamp,
-                    onSelectBucketTimestamp = { viewModel.selectBucket(it) }
-                )
-
-                // 5. Minimal Registration-Day Explainer Callout (at bottom)
-                if (uiState.isNewlyRegisteredPromo) {
-                    RegistrationExplainerCard()
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
             }
         }
     }

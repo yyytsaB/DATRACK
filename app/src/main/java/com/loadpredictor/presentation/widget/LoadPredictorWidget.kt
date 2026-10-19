@@ -1,736 +1,90 @@
 package com.loadpredictor.presentation.widget
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.DashPathEffect
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PointF
-import android.graphics.RectF
-import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
-import androidx.glance.Image
-import androidx.glance.ImageProvider
-import androidx.glance.LocalSize
+import androidx.glance.*
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.LinearProgressIndicator
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.appWidgetBackground
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.background
-import androidx.glance.currentState
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxHeight
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.height
-import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.layout.width
-import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.appwidget.*
+import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.layout.*
 import androidx.glance.state.PreferencesGlanceStateDefinition
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
+import androidx.glance.text.*
 import androidx.glance.unit.ColorProvider
 import com.loadpredictor.MainActivity
 import com.loadpredictor.data.local.AppDatabase
-import com.loadpredictor.data.repository.PromoRepositoryImpl
-import com.loadpredictor.data.repository.UsageRepositoryImpl
-import com.loadpredictor.data.stats.NetworkStatsDataSource
-import com.loadpredictor.data.stats.UsageAccessHelper
-import com.loadpredictor.domain.engine.BurnRateEngine
+import com.loadpredictor.data.repository.*
+import com.loadpredictor.data.stats.*
 import com.loadpredictor.domain.model.BurnPace
-import com.loadpredictor.domain.model.SimSlot
-import com.loadpredictor.presentation.theme.LoadPredictorGlanceColorScheme
-import com.loadpredictor.presentation.theme.getDataProgressColor
-import com.loadpredictor.presentation.theme.getDataProgressIntColor
+import com.loadpredictor.presentation.common.ForecastCopy
 import com.loadpredictor.util.DataFormatter
-import kotlinx.coroutines.flow.first
 
-/**
- * Material 3 Jetpack Glance home screen widget for Datrack.
- *
- * Implements single-row 2x1 (compact) and 4x1 (wide) horizontal layouts:
- * - 2x1: Circular progress ring + remaining balance + SIM/Pace label
- * - 4x1: Left column (Brand/SIM + Remaining balance) + Right column (Linear bar + ETA/Pace)
- */
+/** Content-first, tall enough to wrap essential text at large font settings. */
 class LoadPredictorWidget : GlanceAppWidget() {
-
-    companion object {
-        private val SIZE_2X1 = DpSize(110.dp, 40.dp)
-        private val SIZE_4X1 = DpSize(220.dp, 40.dp)
-    }
-
-    override var sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(SIZE_2X1, SIZE_4X1)
-    )
-
-    override var stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
-
+    override val sizeMode = SizeMode.Responsive(setOf(DpSize(150.dp, 240.dp), DpSize(280.dp, 240.dp)))
+    override val stateDefinition = PreferencesGlanceStateDefinition
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        try {
-            val usageHelper = UsageAccessHelper(context)
-            val database = AppDatabase.getInstance(context)
-            val promoRepo = PromoRepositoryImpl(database.promoDao())
-            val activePromo = promoRepo.getActivePromo().first()
-
-            if (!usageHelper.hasUsageAccessPermission()) {
-                updateAppWidgetState(context, id) { prefs ->
-                    prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_PERMISSION_REQUIRED
-                }
-            } else if (activePromo == null) {
-                updateAppWidgetState(context, id) { prefs ->
-                    prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_NO_ACTIVE_PROMO
-                }
-            } else {
-                val networkStatsDataSource = NetworkStatsDataSource(context)
-                val usageRepo = UsageRepositoryImpl(usageHelper, networkStatsDataSource)
-                val getDailyUsageBreakdownUseCase = com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo)
-                val getActiveBurnForecastUseCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(
-                    promoRepository = promoRepo,
-                    usageRepository = usageRepo,
-                    getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase
-                )
-                val result = getActiveBurnForecastUseCase.execute(activePromo)
-                if (result is com.loadpredictor.domain.model.BurnForecastResult.Success) {
-                    val forecast = result.forecast
-                    val now = System.currentTimeMillis()
-                    updateAppWidgetState(context, id) { prefs ->
-                        prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_SUCCESS
-                        prefs[WidgetStatePreferences.KEY_PROMO_NAME] = forecast.promo.name
-                        prefs[WidgetStatePreferences.KEY_SIM_SLOT] = forecast.promo.simSlot.name
-                        prefs[WidgetStatePreferences.KEY_REMAINING_BYTES] = forecast.dataRemainingBytes
-                        prefs[WidgetStatePreferences.KEY_TOTAL_ALLOWANCE_BYTES] = forecast.promo.totalAllowanceBytes
-                        prefs[WidgetStatePreferences.KEY_PACE] = forecast.pace.name
-                        prefs[WidgetStatePreferences.KEY_SUMMARY] = forecast.plainLanguageSummary
-                        prefs[WidgetStatePreferences.KEY_IS_NO_EXPIRY] = forecast.promo.isNoExpiry
-                        prefs[WidgetStatePreferences.KEY_LAST_UPDATED] = now
-                        prefs[WidgetStatePreferences.KEY_ESTIMATED_DEPLETION_TIMESTAMP] = forecast.estimatedDepletionTimestamp ?: -1L
-                        prefs[WidgetStatePreferences.KEY_DAILY_BURN_RATE_BYTES] = if (forecast.burnRateBytesPerHour > 0.0) {
-                            kotlin.math.round(forecast.burnRateBytesPerHour * 24.0).toLong()
-                        } else {
-                            0L
-                        }
-                        prefs[WidgetStatePreferences.KEY_EXPIRATION_TIMESTAMP] = forecast.promo.expirationTimestamp ?: -1L
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            updateAppWidgetState(context, id) { prefs ->
-                prefs[WidgetStatePreferences.KEY_STATE_TYPE] = WidgetStatePreferences.TYPE_ERROR
-                prefs[WidgetStatePreferences.KEY_ERROR_MESSAGE] = e.localizedMessage ?: "Forecast error"
-            }
-        }
-
+        val repo = PromoRepositoryImpl(AppDatabase.getInstance(context).promoDao())
+        val usage = UsageRepositoryImpl(UsageAccessHelper(context), NetworkStatsDataSource(context))
+        // The helper handles every result, so a revoked permission cannot leave a success layout behind.
+        val computed = WidgetSyncHelper.computeWidgetState(repo, usage)
+        WidgetStatePreferences.saveState(context, id, computed)
         provideContent {
-            GlanceTheme(colors = LoadPredictorGlanceColorScheme) {
-                val preferences = currentState<Preferences>()
-                val state = WidgetStatePreferences.readState(preferences)
-                val size = LocalSize.current
-                val isWide = size.width >= 210.dp
-
-                WidgetRoot(state = state, isWide = isWide)
-            }
+            val prefs = currentState<Preferences>()
+            val state = WidgetStatePreferences.readState(prefs)
+            WidgetContent(state, LocalSize.current.width >= 280.dp)
         }
     }
 }
 
+private val ink = ColorProvider(Color(0xFFF1F6F4))
+private val secondary = ColorProvider(Color(0xFFB4C5BD))
+private val mint = ColorProvider(Color(0xFF74F4CE))
+
 @Composable
-private fun WidgetRoot(state: WidgetState, isWide: Boolean) {
-    Box(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .appWidgetBackground()
-            .background(ColorProvider(Color(0xFF131722)))
-            .cornerRadius(20.dp)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clickable(actionStartActivity<MainActivity>()),
-        contentAlignment = Alignment.Center
-    ) {
+private fun WidgetContent(state: WidgetState, wide: Boolean) {
+    Column(GlanceModifier.fillMaxSize().appWidgetBackground().background(ColorProvider(Color(0xFF10241E)))
+        .cornerRadius(20.dp).padding(12.dp).clickable(actionStartActivity<MainActivity>()),
+        verticalAlignment = Alignment.Vertical.CenterVertically) {
         when (state) {
             is WidgetState.Success -> {
-                if (isWide) Success4x1Layout(state = state) else Success2x1Layout(state = state)
+                val expired = state.pace == BurnPace.EXPIRED
+                Text(if (expired) "Promo expired" else "${DataFormatter.formatBytes(state.remainingBytes)} left",
+                    style = TextStyle(color = ink, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+                Spacer(GlanceModifier.height(6.dp))
+                Text(ForecastCopy.status(state.pace, state.isNoExpiry), style = TextStyle(color = mint, fontSize = 14.sp))
+                if (wide) {
+                    Spacer(GlanceModifier.height(6.dp))
+                    Text(ForecastCopy.runway(state.pace, state.estimatedDepletionTimestamp, System.currentTimeMillis()),
+                        style = TextStyle(color = ink, fontSize = 14.sp))
+                    Text(if (state.isNoExpiry) "No expiry" else "Ends ${ForecastCopy.date(state.expirationTimestamp!!)}",
+                        style = TextStyle(color = secondary, fontSize = 12.sp))
+                }
+                Spacer(GlanceModifier.height(8.dp))
+                Text(ForecastCopy.updated(state.lastUpdatedMillis, System.currentTimeMillis()), style = TextStyle(color = secondary, fontSize = 12.sp))
             }
-            is WidgetState.NoActivePromo -> {
-                if (isWide) NoActivePromoWideLayout() else NoActivePromoCompactLayout()
+            WidgetState.NoActivePromo -> {
+                Text("Add a promo", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
+                Text("Tap to start tracking", style = TextStyle(color = secondary, fontSize = 14.sp))
             }
-            is WidgetState.PermissionRequired -> {
-                if (isWide) PermissionRequiredWideLayout() else PermissionRequiredCompactLayout()
+            WidgetState.PermissionRequired -> {
+                Text("Allow Usage Access", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
+                Text("Tap to open DATRACK", style = TextStyle(color = secondary, fontSize = 14.sp))
             }
             is WidgetState.Error -> {
-                if (isWide) ErrorWideLayout(message = state.message) else ErrorCompactLayout()
+                Text("Reading unavailable", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
+                Text("Open DATRACK or try Refresh", style = TextStyle(color = secondary, fontSize = 14.sp))
             }
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 2x1 and 4x1 Success Layouts
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun Success2x1Layout(state: WidgetState.Success) {
-    val remainingFraction = if (state.totalAllowanceBytes > 0L) {
-        (state.remainingBytes.toFloat() / state.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val ringBitmap = renderGlanceRingBitmap(progress = remainingFraction, remainingRatio = remainingFraction)
-    val dataPair = DataFormatter.formatDataPair(
-        remainingBytes = state.remainingBytes,
-        totalAllowanceBytes = state.totalAllowanceBytes
-    )
-    val paceColorProvider = getGlancePaceColor(state.pace)
-    val paceLabel = getGlancePaceLabel(state.pace, state.isNoExpiry)
-    val simLabel = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
-
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        // Left: Circular Ring Bitmap
-        Image(
-            provider = ImageProvider(ringBitmap),
-            contentDescription = null,
-            modifier = GlanceModifier.size(40.dp)
-        )
-
-        Spacer(modifier = GlanceModifier.width(10.dp))
-
-        // Right: Amount + SIM/Pace label
-        Column(
-            modifier = GlanceModifier.defaultWeight(),
-            verticalAlignment = Alignment.Vertical.CenterVertically
-        ) {
-            Text(
-                text = dataPair.remainingFormatted,
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFFFFFFFF)),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                ),
-                maxLines = 1
-            )
-            Spacer(modifier = GlanceModifier.height(1.dp))
-            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                Text(
-                    text = "$simLabel • ",
-                    style = TextStyle(
-                        color = ColorProvider(Color(0xFF8E99A8)),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-                Text(
-                    text = paceLabel,
-                    style = TextStyle(
-                        color = paceColorProvider,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    maxLines = 1
-                )
-            }
+        Spacer(GlanceModifier.height(8.dp))
+        Box(GlanceModifier.fillMaxWidth().height(48.dp).clickable(actionRunCallback<RefreshWidgetCallback>()),
+            contentAlignment = Alignment.CenterStart) {
+            Text("Refresh", style = TextStyle(color = mint, fontSize = 14.sp, fontWeight = FontWeight.Bold))
         }
     }
-}
-
-@Composable
-private fun Success4x1Layout(state: WidgetState.Success) {
-    val remainingFraction = if (state.totalAllowanceBytes > 0L) {
-        (state.remainingBytes.toFloat() / state.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val dataPair = DataFormatter.formatDataPair(
-        remainingBytes = state.remainingBytes,
-        totalAllowanceBytes = state.totalAllowanceBytes
-    )
-    val paceColorProvider = getGlancePaceColor(state.pace)
-    val paceLabel = getGlancePaceLabel(state.pace, state.isNoExpiry)
-    val simLabel = if (state.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
-    val progressColor = getDataProgressColor(remainingFraction)
-
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        // Left Column: Brand/SIM + Remaining balance
-        Column(
-            modifier = GlanceModifier.defaultWeight(),
-            verticalAlignment = Alignment.Vertical.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                Text(
-                    text = "DATRACK",
-                    style = TextStyle(
-                        color = ColorProvider(Color(0xFF00F5D4)),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    )
-                )
-                Text(
-                    text = " • $simLabel",
-                    style = TextStyle(
-                        color = ColorProvider(Color(0xFF8E99A8)),
-                        fontSize = 10.sp
-                    )
-                )
-            }
-            Spacer(modifier = GlanceModifier.height(1.dp))
-            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                Text(
-                    text = dataPair.remainingFormatted,
-                    style = TextStyle(
-                        color = ColorProvider(Color(0xFFFFFFFF)),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                )
-                Text(
-                    text = " / ${dataPair.totalFormatted}",
-                    style = TextStyle(
-                        color = ColorProvider(Color(0xFF8E99A8)),
-                        fontSize = 11.sp
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = GlanceModifier.width(12.dp))
-
-        // Right Column: Projected Depletion Sparkline + ETA / Pace Status
-        Column(
-            modifier = GlanceModifier.defaultWeight(),
-            verticalAlignment = Alignment.Vertical.CenterVertically
-        ) {
-            val sparklineBitmap = renderGlanceSparklineBitmap(
-                remainingBytes = state.remainingBytes,
-                totalAllowanceBytes = state.totalAllowanceBytes,
-                dailyBurnRateBytes = state.dailyBurnRateBytes,
-                estimatedDepletionTimestamp = state.estimatedDepletionTimestamp,
-                expirationTimestamp = state.expirationTimestamp,
-                pace = state.pace
-            )
-            Image(
-                provider = ImageProvider(sparklineBitmap),
-                contentDescription = "Projected depletion curve",
-                modifier = GlanceModifier.fillMaxWidth().height(20.dp)
-            )
-            Spacer(modifier = GlanceModifier.height(2.dp))
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Vertical.CenterVertically
-            ) {
-                val etaSummary = formatWidgetDepletionEta(state, paceLabel)
-                Text(
-                    text = etaSummary,
-                    style = TextStyle(
-                        color = paceColorProvider,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    ),
-                    maxLines = 1,
-                    modifier = GlanceModifier.defaultWeight()
-                )
-            }
-        }
-    }
-}
-
-private fun formatWidgetDepletionEta(state: WidgetState.Success, paceLabel: String): String {
-    if (state.pace == BurnPace.DEPLETED) return "Depleted"
-    val depletionTime = state.estimatedDepletionTimestamp
-    if (depletionTime != null && depletionTime > System.currentTimeMillis()) {
-        return "Runs out ${DataFormatter.formatDepletionDateTime(depletionTime)}"
-    }
-    return if (state.pace == BurnPace.INSUFFICIENT_DATA) {
-        "Calibrating pace"
-    } else {
-        paceLabel
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Other Widget States (NoActivePromo, PermissionRequired, Error)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun NoActivePromoCompactLayout() {
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Text(
-            text = "No Active Promo",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFFFFFFFF)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            ),
-            modifier = GlanceModifier.defaultWeight()
-        )
-        Text(
-            text = "Set up →",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFF00F5D4)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun NoActivePromoWideLayout() {
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Column(modifier = GlanceModifier.defaultWeight()) {
-            Text(
-                text = "No Active Promo Tracked",
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFFFFFFFF)),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            )
-            Text(
-                text = "Tap to configure a Smart promo",
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFF8E99A8)),
-                    fontSize = 11.sp
-                )
-            )
-        }
-        Text(
-            text = "Set up →",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFF00F5D4)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun PermissionRequiredCompactLayout() {
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Text(
-            text = "Permission Needed",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFFFACC15)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            ),
-            modifier = GlanceModifier.defaultWeight()
-        )
-        Text(
-            text = "Grant →",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFF00F5D4)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun PermissionRequiredWideLayout() {
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Column(modifier = GlanceModifier.defaultWeight()) {
-            Text(
-                text = "Usage Access Required",
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFFFACC15)),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            )
-            Text(
-                text = "Tap to grant Usage Access in Settings",
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFF8E99A8)),
-                    fontSize = 11.sp
-                )
-            )
-        }
-        Text(
-            text = "Grant →",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFF00F5D4)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun ErrorCompactLayout() {
-    Row(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Text(
-            text = "Forecast Unavailable",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFFFF4D4D)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun ErrorWideLayout(message: String) {
-    Column(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.Vertical.CenterVertically
-    ) {
-        Text(
-            text = "Forecast Error",
-            style = TextStyle(
-                color = ColorProvider(Color(0xFFFF4D4D)),
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
-        )
-        Text(
-            text = message,
-            style = TextStyle(
-                color = ColorProvider(Color(0xFF8E99A8)),
-                fontSize = 11.sp
-            ),
-            maxLines = 1
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers: Bitmap Ring & Pace Colors
-// ---------------------------------------------------------------------------
-
-private fun renderGlanceRingBitmap(progress: Float, remainingRatio: Float): Bitmap {
-    val size = 96
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val strokeWidth = 10f
-    val pad = strokeWidth / 2f + 4f
-    val rect = RectF(pad, pad, size - pad, size - pad)
-
-    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-        color = 0xFF232B3D.toInt()
-    }
-    canvas.drawCircle(size / 2f, size / 2f, (size - strokeWidth) / 2f - 4f, trackPaint)
-
-    val progressColor = getDataProgressIntColor(remainingRatio)
-    val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-        strokeCap = Paint.Cap.ROUND
-        color = progressColor
-    }
-    if (progress > 0f) {
-        canvas.drawArc(rect, -90f, progress * 360f, false, progressPaint)
-    }
-    return bitmap
-}
-
-private fun getGlancePaceColor(pace: BurnPace): ColorProvider {
-    return when (pace) {
-        BurnPace.ON_TRACK, BurnPace.CONSERVATIVE -> ColorProvider(Color(0xFF00F5D4))
-        BurnPace.BURNING_FAST -> ColorProvider(Color(0xFFFACC15))
-        BurnPace.DEPLETED -> ColorProvider(Color(0xFFFF4D4D))
-        BurnPace.INSUFFICIENT_DATA -> ColorProvider(Color(0xFF94A3B8))
-    }
-}
-
-private fun getGlancePaceLabel(pace: BurnPace, isNoExpiry: Boolean): String {
-    return if (isNoExpiry) {
-        when (pace) {
-            BurnPace.ON_TRACK -> "Pace Normal"
-            BurnPace.CONSERVATIVE -> "Low Burn"
-            BurnPace.BURNING_FAST -> "Fast Burn"
-            BurnPace.DEPLETED -> "Data Depleted"
-            BurnPace.INSUFFICIENT_DATA -> "Calibrating"
-        }
-    } else {
-        when (pace) {
-            BurnPace.ON_TRACK -> "On Track"
-            BurnPace.CONSERVATIVE -> "Under Pace"
-            BurnPace.BURNING_FAST -> "Burning Fast"
-            BurnPace.DEPLETED -> "Depleted"
-            BurnPace.INSUFFICIENT_DATA -> "Calibrating"
-        }
-    }
-}
-
-internal fun renderGlanceSparklineBitmap(
-    remainingBytes: Long,
-    totalAllowanceBytes: Long,
-    dailyBurnRateBytes: Long,
-    estimatedDepletionTimestamp: Long?,
-    expirationTimestamp: Long?,
-    pace: BurnPace,
-    now: Long = System.currentTimeMillis()
-): Bitmap {
-    val width = 240
-    val height = 48
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    val strokeWidth = 3f
-    val padX = 4f
-    val padTop = 6f
-    val padBottom = 6f
-    val drawWidth = width - 2 * padX
-    val drawHeight = height - padTop - padBottom
-
-    // Faint baseline floor
-    val baseLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        this.strokeWidth = 1.5f
-        color = 0xFF232B3D.toInt()
-    }
-    val groundY = height - padBottom
-    canvas.drawLine(padX, groundY, width - padX, groundY, baseLinePaint)
-
-    val paceColor = when (pace) {
-        BurnPace.ON_TRACK, BurnPace.CONSERVATIVE -> 0xFF00F5D4.toInt() // 🟢 Mint
-        BurnPace.BURNING_FAST -> 0xFFFACC15.toInt() // 🟡 Amber
-        BurnPace.DEPLETED -> 0xFFFF4D4D.toInt() // 🔴 Red
-        BurnPace.INSUFFICIENT_DATA -> 0xFF94A3B8.toInt() // ⚪ Slate
-    }
-
-    if (pace == BurnPace.DEPLETED || remainingBytes <= 0L) {
-        // Flat red line at ground
-        val flatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            this.strokeWidth = strokeWidth
-            strokeCap = Paint.Cap.ROUND
-            color = paceColor
-        }
-        canvas.drawLine(padX, groundY, width - padX, groundY, flatPaint)
-        return bitmap
-    }
-
-    val totalAllowance = maxOf(1L, totalAllowanceBytes).toDouble()
-    val initialFraction = (remainingBytes.toDouble() / totalAllowance).coerceIn(0.0, 1.0)
-    val initialY = (padTop + (1.0 - initialFraction) * drawHeight).toFloat()
-
-    if (pace == BurnPace.INSUFFICIENT_DATA || dailyBurnRateBytes <= 0L || estimatedDepletionTimestamp == null) {
-        // Neutral dashed line at current balance
-        val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            this.strokeWidth = strokeWidth
-            strokeCap = Paint.Cap.ROUND
-            color = paceColor
-            pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
-        }
-        canvas.drawLine(padX, initialY, width - padX, initialY, dashPaint)
-        return bitmap
-    }
-
-    // Determine horizon
-    val msUntilDepletion = maxOf(0L, estimatedDepletionTimestamp - now)
-    val daysUntilDepletion = msUntilDepletion.toDouble() / 86_400_000.0
-
-    val horizonDays = if (expirationTimestamp != null && expirationTimestamp > now) {
-        maxOf(0.5, (expirationTimestamp - now).toDouble() / 86_400_000.0)
-    } else {
-        // Non-expiring promo: display up to 14 days lookahead or until depletion
-        daysUntilDepletion.coerceIn(0.5, 14.0)
-    }
-
-    val numPoints = 8
-    val points = mutableListOf<PointF>()
-    for (i in 0..numPoints) {
-        val frac = i.toDouble() / numPoints.toDouble()
-        val dayOffset = frac * horizonDays
-        val projectedRemaining = maxOf(0.0, remainingBytes.toDouble() - dayOffset * dailyBurnRateBytes.toDouble())
-        val remainingRatio = (projectedRemaining / totalAllowance).coerceIn(0.0, 1.0)
-
-        val x = (padX + frac * drawWidth).toFloat()
-        val y = (padTop + (1.0 - remainingRatio) * drawHeight).toFloat()
-        points.add(PointF(x, y))
-    }
-
-    // Build stroke path
-    val strokePath = Path()
-    strokePath.moveTo(points.first().x, points.first().y)
-    for (i in 1 until points.size) {
-        val prev = points[i - 1]
-        val curr = points[i]
-        val midX = (prev.x + curr.x) / 2f
-        val midY = (prev.y + curr.y) / 2f
-        strokePath.quadTo(prev.x, prev.y, midX, midY)
-    }
-    strokePath.lineTo(points.last().x, points.last().y)
-
-    // Build fill path
-    val fillPath = Path(strokePath)
-    fillPath.lineTo(points.last().x, groundY)
-    fillPath.lineTo(points.first().x, groundY)
-    fillPath.close()
-
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        shader = LinearGradient(
-            0f, padTop,
-            0f, groundY,
-            paceColor and 0x00FFFFFF or (0x44 shl 24), // 27% alpha at top
-            paceColor and 0x00FFFFFF or (0x00 shl 24), // 0% alpha at bottom
-            Shader.TileMode.CLAMP
-        )
-    }
-    canvas.drawPath(fillPath, fillPaint)
-
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-        strokeCap = Paint.Cap.ROUND
-        color = paceColor
-    }
-    canvas.drawPath(strokePath, strokePaint)
-
-    // Start dot
-    val startDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = paceColor
-    }
-    canvas.drawCircle(points.first().x, points.first().y, 3.5f, startDotPaint)
-
-    return bitmap
 }

@@ -62,6 +62,7 @@ fun DashboardStatChips(
     // 3. At This Pace / Projection Chip
     val (paceValue, paceLabel) = when (forecast.pace) {
         BurnPace.INSUFFICIENT_DATA -> Pair("Calibrating", "At this pace")
+        BurnPace.EXPIRED -> Pair("Expired", "Validity ended")
         BurnPace.DEPLETED -> Pair("0 days", "At this pace")
         else -> {
             if (forecast.estimatedDepletionTimestamp != null) {

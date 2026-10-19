@@ -54,6 +54,11 @@ data class Promo(
     /**
      * Total validity window of the promo in milliseconds, or null for non-expiring promos.
      */
+    /** Offset and live observation share the same accounting on every surface. */
+    fun remainingBytes(measuredBytes: Long): Long =
+        (totalAllowanceBytes - initialUsageOffsetBytes - measuredBytes.coerceAtLeast(0L)
+            .coerceAtMost(totalAllowanceBytes - initialUsageOffsetBytes)).coerceAtLeast(0L)
+
     val totalDurationMillis: Long?
         get() = expirationTimestamp?.let { it - startTimestamp }
 

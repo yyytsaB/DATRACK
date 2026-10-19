@@ -64,12 +64,8 @@ object WidgetStatePreferences {
         }
     }
 
-    suspend fun saveStateAndNotify(context: Context, state: WidgetState) {
-        val manager = GlanceAppWidgetManager(context)
-        val glanceIds = manager.getGlanceIds(LoadPredictorWidget::class.java)
-
-        glanceIds.forEach { glanceId ->
-            updateAppWidgetState(context, glanceId) { preferences ->
+    suspend fun saveState(context: Context, id: androidx.glance.GlanceId, state: WidgetState) {
+        updateAppWidgetState(context, id) { preferences ->
                 when (state) {
                     is WidgetState.Success -> {
                         preferences[KEY_STATE_TYPE] = TYPE_SUCCESS
@@ -96,8 +92,12 @@ object WidgetStatePreferences {
                         preferences[KEY_ERROR_MESSAGE] = state.message
                     }
                 }
-            }
         }
+    }
+
+    suspend fun saveStateAndNotify(context: Context, state: WidgetState) {
+        val manager = GlanceAppWidgetManager(context)
+        manager.getGlanceIds(LoadPredictorWidget::class.java).forEach { id -> saveState(context, id, state) }
         LoadPredictorWidget().updateAll(context)
     }
 }

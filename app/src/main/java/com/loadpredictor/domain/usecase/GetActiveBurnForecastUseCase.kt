@@ -13,6 +13,8 @@ import com.loadpredictor.domain.time.DefaultTimeProvider
 import com.loadpredictor.domain.time.TimeProvider
 import com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase
 import java.util.Calendar
+import com.loadpredictor.domain.model.isCompletedDay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.transform
@@ -40,7 +42,7 @@ class GetActiveBurnForecastUseCase(
             val now = currentTime ?: timeProvider.currentTimeMillis()
             val usedBytes = usageRepository.queryMobileUsageBytes(
                 startTime = activePromo.startTimestamp,
-                endTime = now
+                endTime = minOf(now, activePromo.expirationTimestamp ?: now)
             )
             val forecast = burnRateEngine.calculateForecast(
                 promo = activePromo,
@@ -87,7 +89,7 @@ class GetActiveBurnForecastUseCase(
                 val dailyMeanRate = computeDailyMeanBytesPerHour(recentCompletedBuckets)
                 if (dailyMeanRate != null && dailyMeanRate > 0.0 &&
                     forecast.pace != BurnPace.INSUFFICIENT_DATA &&
-                    forecast.pace != BurnPace.DEPLETED
+                    forecast.pace != BurnPace.DEPLETED && forecast.pace != BurnPace.EXPIRED
                 ) {
                     val remainingHours = forecast.dataRemainingBytes.toDouble() / dailyMeanRate
                     val remainingMs = (remainingHours * 3_600_000.0).toLong()
@@ -100,6 +102,8 @@ class GetActiveBurnForecastUseCase(
                     )
                     forecast.copy(
                         burnRateBytesPerHour = dailyMeanRate,
+                        modelSource = "7-day completed-day average",
+                        pace = projectionPace(activePromo, anchoredDepletionTime),
                         estimatedDepletionTimestamp = anchoredDepletionTime,
                         plainLanguageSummary = buildAnchoredSummary(activePromo, anchoredDepletionTime, now),
                         depletionEarlyTimestamp = intervalPair?.first,
@@ -118,8 +122,14 @@ class GetActiveBurnForecastUseCase(
                     syncTimestamp = now
                 )
             }
-            BurnForecastResult.Success(anchoredForecast)
+            val consistentForecast = if (anchoredForecast.pace != BurnPace.EXPIRED &&
+                anchoredForecast.pace != BurnPace.DEPLETED && anchoredForecast.pace != BurnPace.INSUFFICIENT_DATA &&
+                anchoredForecast.estimatedDepletionTimestamp != null) {
+                anchoredForecast.copy(pace = projectionPace(activePromo, anchoredForecast.estimatedDepletionTimestamp))
+            } else anchoredForecast
+            BurnForecastResult.Success(consistentForecast)
         } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
             if (throwable is UsageAccessDeniedException || throwable.cause is UsageAccessDeniedException) {
                 BurnForecastResult.PermissionRequired
             } else {
@@ -140,6 +150,7 @@ class GetActiveBurnForecastUseCase(
         val buckets = try {
             useCase(promo, currentTime)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             return emptyList()
         }
         val todayStartMs = run {
@@ -151,7 +162,7 @@ class GetActiveBurnForecastUseCase(
             cal.set(Calendar.MILLISECOND, 0)
             cal.timeInMillis
         }
-        val completedBuckets = buckets.filter { it.startTimestamp < todayStartMs && it.totalBytes >= 0L }
+        val completedBuckets = buckets.filter { it.isCompletedDay(currentTime) && it.totalBytes >= 0L }
         return completedBuckets.takeLast(DAILY_ANCHOR_WINDOW_DAYS)
     }
 
@@ -210,6 +221,15 @@ class GetActiveBurnForecastUseCase(
         if (halfSpreadDays <= 0) return null
 
         return Pair(earlyTs, lateTs)
+    }
+
+    private fun projectionPace(promo: Promo, depletion: Long): BurnPace {
+        val expiry = promo.expirationTimestamp ?: return BurnPace.ON_TRACK
+        return when {
+            depletion < expiry -> BurnPace.BURNING_FAST
+            depletion > expiry + 12L * 3_600_000L -> BurnPace.CONSERVATIVE
+            else -> BurnPace.ON_TRACK
+        }
     }
 
     private fun buildAnchoredSummary(

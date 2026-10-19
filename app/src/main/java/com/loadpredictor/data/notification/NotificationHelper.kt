@@ -47,21 +47,18 @@ class NotificationHelper(private val context: Context) {
     }
 
     fun canPostNotifications(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            NotificationManagerCompat.from(context).areNotificationsEnabled()
-        }
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val permission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        return permission && NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+            manager.getNotificationChannel(CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
     }
 
     /**
      * Posts an alert when data usage crosses 50%, 80%, or 90% of total allocation.
      */
-    fun showThresholdAlert(promoName: String, thresholdPercent: Int, remainingBytes: Long) {
-        if (!canPostNotifications()) return
+    fun showThresholdAlert(promoName: String, thresholdPercent: Int, remainingBytes: Long): Boolean {
+        if (!canPostNotifications()) return false
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -87,18 +84,19 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(true)
             .build()
 
-        try {
+        return try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_THRESHOLD + thresholdPercent, notification)
+            true
         } catch (e: SecurityException) {
-            // Permission revoked
+            false
         }
     }
 
     /**
      * Posts an alert when an expiring promo is projected to deplete prematurely.
      */
-    fun showPrematureDepletionAlert(promoName: String, hoursEarly: Long, remainingBytes: Long) {
-        if (!canPostNotifications()) return
+    fun showPrematureDepletionAlert(promoName: String, hoursEarly: Long, remainingBytes: Long): Boolean {
+        if (!canPostNotifications()) return false
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -125,10 +123,11 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(true)
             .build()
 
-        try {
+        return try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_PREMATURE, notification)
+            true
         } catch (e: SecurityException) {
-            // Permission revoked
+            false
         }
     }
 }

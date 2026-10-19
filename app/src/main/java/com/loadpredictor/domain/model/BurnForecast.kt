@@ -30,5 +30,7 @@ data class BurnForecast(
     val isDepleted: Boolean,
     val timeRemainingMillis: Long?,
     val depletionEarlyTimestamp: Long? = null,
-    val depletionLateTimestamp: Long? = null
+    val depletionLateTimestamp: Long? = null,
+    val observedAt: Long = 0L,
+    val modelSource: String = "Recent activity"
 )

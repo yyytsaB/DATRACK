@@ -27,6 +27,7 @@ data class PromoUiState(
     val activePromo: Promo? = null,
     val activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     val isLoading: Boolean = true,
+    val isSaving: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -107,8 +108,11 @@ class PromoViewModel(
         onSuccess: (Long) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
+        if (_uiState.value.isSaving) return
+        _uiState.update { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
             try {
+                val baselineChanged = existingPromo != null && (existingPromo.startTimestamp != startTimestamp || existingPromo.initialUsageOffsetBytes != initialUsageOffsetBytes)
                 val promo = Promo(
                     id = id,
                     name = name,
@@ -118,18 +122,23 @@ class PromoViewModel(
                     initialUsageOffsetBytes = initialUsageOffsetBytes,
                     simSlot = simSlot,
                     isActive = isActive,
-                    lastActiveBurnRate = null,
-                    lastSyncDataUsedBytes = existingPromo?.lastSyncDataUsedBytes ?: 0L,
-                    lastSyncTimestamp = existingPromo?.lastSyncTimestamp ?: 0L
+                    lastActiveBurnRate = if (baselineChanged) null else existingPromo?.lastActiveBurnRate,
+                    lastSyncDataUsedBytes = if (baselineChanged) 0L else existingPromo?.lastSyncDataUsedBytes ?: 0L,
+                    lastSyncTimestamp = if (baselineChanged) 0L else existingPromo?.lastSyncTimestamp ?: 0L
                 )
                 val savedId = savePromoUseCase(promo)
-                notificationPreferences?.clearThresholdsForPromo(savedId)
+                if (existingPromo == null || existingPromo.totalAllowanceBytes != allowanceBytes ||
+                    existingPromo.initialUsageOffsetBytes != initialUsageOffsetBytes || existingPromo.startTimestamp != startTimestamp) {
+                    notificationPreferences?.clearThresholdsForPromo(savedId)
+                }
                 onPromoMutated?.invoke()
                 onSuccess(savedId)
             } catch (e: Exception) {
                 val msg = e.localizedMessage ?: "Failed to save promo"
                 _uiState.update { it.copy(errorMessage = msg) }
                 onError(msg)
+            } finally {
+                _uiState.update { it.copy(isSaving = false) }
             }
         }
     }
@@ -168,7 +177,8 @@ class PromoViewModel(
                     val usageHelper = com.loadpredictor.data.stats.UsageAccessHelper(appContext)
                     val networkStatsDataSource = com.loadpredictor.data.stats.NetworkStatsDataSource(appContext)
                     val usageRepo = com.loadpredictor.data.repository.UsageRepositoryImpl(usageHelper, networkStatsDataSource)
-                    val getActiveBurnForecastUseCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(promoRepo, usageRepo)
+                    val getActiveBurnForecastUseCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(promoRepo, usageRepo,
+                        getDailyUsageBreakdownUseCase = com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo))
 
                     return PromoViewModel(
                         promoRepository = promoRepo,

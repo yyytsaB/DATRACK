@@ -38,7 +38,7 @@ class GetDailyUsageBreakdownUseCase(
     ): List<UsageBucket> {
         val windowStart = currentTime - timeRange.windowMs
         val startTime = maxOf(promo.startTimestamp, windowStart)
-        val endTime = maxOf(startTime, currentTime)
+        val endTime = maxOf(startTime, minOf(currentTime, promo.expirationTimestamp ?: currentTime))
 
         if (startTime >= endTime) {
             return emptyList()

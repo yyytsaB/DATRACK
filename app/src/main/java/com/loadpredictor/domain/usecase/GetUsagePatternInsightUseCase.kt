@@ -6,6 +6,7 @@ import com.loadpredictor.domain.model.UsagePatternInsight
 import com.loadpredictor.domain.time.DefaultTimeProvider
 import com.loadpredictor.domain.time.TimeProvider
 import com.loadpredictor.util.DataFormatter
+import com.loadpredictor.domain.model.isCompletedDay
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
@@ -50,7 +51,7 @@ class GetUsagePatternInsightUseCase(
         }
         val startOfToday = todayCal.timeInMillis
 
-        val completedBuckets = dailyBuckets.filter { it.startTimestamp < startOfToday }
+        val completedBuckets = dailyBuckets.filter { it.isCompletedDay(currentTime, timeZone.toZoneId()) }
 
         // 2. Classify completed buckets into Weekdays (Mon-Fri) vs Weekends (Sat-Sun)
         val weekdayBuckets = mutableListOf<UsageBucket>()

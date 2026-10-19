@@ -1,5 +1,6 @@
 package com.loadpredictor.presentation.history
 
+import com.loadpredictor.domain.model.isCompletedDay
 import com.loadpredictor.domain.model.HistoryTimeRange
 import com.loadpredictor.domain.model.Promo
 import com.loadpredictor.domain.model.UsageBucket
@@ -21,6 +22,7 @@ data class HistoryUiState(
     val dailyBuckets: List<UsageBucket> = emptyList(),
     val selectedBucketTimestamp: Long? = null,
     val patternInsight: UsagePatternInsight = UsagePatternInsight.InsufficientData,
+    val errorMessage: String? = null,
     val isLoading: Boolean = true
 ) {
     /**
@@ -48,7 +50,7 @@ data class HistoryUiState(
             cal.set(java.util.Calendar.MILLISECOND, 0)
             cal.timeInMillis
         }
-        val completedBuckets = dailyBuckets.filter { it.startTimestamp < todayStartMs && it.totalBytes >= 0L }
+        val completedBuckets = dailyBuckets.filter { it.isCompletedDay(now) && it.totalBytes >= 0L }
         val targetBuckets = if (completedBuckets.isNotEmpty()) completedBuckets else dailyBuckets
         return (targetBuckets.map { it.totalBytes }.average()).toLong()
     }

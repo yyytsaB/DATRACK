@@ -39,7 +39,12 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 // App is designed with an immersive dark aesthetic as default
-private val LightColorScheme = DarkColorScheme
+private val LightColorScheme = lightColorScheme(
+    primary = Color(0xFF006B5E), onPrimary = Color.White,
+    primaryContainer = Color(0xFF9FF4DF), onPrimaryContainer = Color(0xFF002019),
+    secondary = Color(0xFF42665D), background = Color(0xFFF5FAF7), surface = Color(0xFFF5FAF7),
+    onSurface = Color(0xFF14211D), onBackground = Color(0xFF14211D), onSurfaceVariant = Color(0xFF46534E)
+)
 
 @Composable
 fun LoadPredictorTheme(

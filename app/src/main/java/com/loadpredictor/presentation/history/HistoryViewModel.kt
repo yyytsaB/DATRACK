@@ -86,7 +86,9 @@ class HistoryViewModel(
             val buckets = try {
                 getDailyUsageBreakdownUseCase(promo, timeRange = _uiState.value.selectedRange)
             } catch (e: Exception) {
-                emptyList()
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.update { it.copy(errorMessage = "Usage is unavailable. Check Usage Access and try again.", isLoading = false) }
+                return@launch
             }
 
             val insight = getUsagePatternInsightUseCase(buckets)
@@ -104,6 +106,7 @@ class HistoryViewModel(
                 current.copy(
                     activePromo = promo,
                     dailyBuckets = buckets,
+                    errorMessage = null,
                     selectedBucketTimestamp = preservedTimestamp,
                     patternInsight = insight,
                     isLoading = false
@@ -168,7 +171,9 @@ class HistoryViewModel(
             val buckets = try {
                 getDailyUsageBreakdownUseCase(promo, timeRange = range)
             } catch (e: Exception) {
-                emptyList()
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.update { it.copy(errorMessage = "Usage is unavailable. Check Usage Access and try again.", isLoading = false) }
+                return@launch
             }
 
             val insight = getUsagePatternInsightUseCase(buckets)
@@ -185,6 +190,7 @@ class HistoryViewModel(
                 current.copy(
                     activePromo = promo,
                     dailyBuckets = buckets,
+                    errorMessage = null,
                     selectedBucketTimestamp = preservedTimestamp,
                     patternInsight = insight,
                     isLoading = false

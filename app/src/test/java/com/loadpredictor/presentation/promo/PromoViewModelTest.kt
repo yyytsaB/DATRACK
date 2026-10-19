@@ -177,7 +177,7 @@ class PromoViewModelTest {
     }
 
     @Test
-    fun `savePromo with existing id updates promo, preserves lastSyncDataUsedBytes and lastSyncTimestamp, and nulls lastActiveBurnRate`() = runTest {
+    fun `savePromo with existing id updates promo, preserves lastSyncDataUsedBytes and lastSyncTimestamp, and preserves established rate`() = runTest {
         val existingPromo = Promo(
             id = 42L,
             name = "Old Name",
@@ -229,7 +229,7 @@ class PromoViewModelTest {
         assertEquals(3_000_000_000L, updated.lastSyncDataUsedBytes)
         assertEquals(4_000_000L, updated.lastSyncTimestamp)
 
-        // Verifying burn rate is reset to null for clean recalibration
-        assertNull(updated.lastActiveBurnRate)
+        // A cosmetic/configuration edit must not erase live velocity when measurement baseline is unchanged.
+        assertEquals(existingPromo.lastActiveBurnRate, updated.lastActiveBurnRate)
     }
 }

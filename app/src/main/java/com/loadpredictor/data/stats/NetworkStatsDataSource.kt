@@ -63,7 +63,7 @@ class NetworkStatsDataSource(
                 cause = e
             )
         } catch (e: RemoteException) {
-            0L
+            throw IllegalStateException("Mobile usage is temporarily unavailable. Try again.", e)
         }
     }
 
@@ -122,15 +122,9 @@ class NetworkStatsDataSource(
                     cause = e
                 )
             } catch (e: Exception) {
-                buckets.add(
-                    UsageBucket(
-                        startTimestamp = currentStart,
-                        endTimestamp = currentEnd,
-                        rxBytes = 0L,
-                        txBytes = 0L
-                    )
-                )
+                throw IllegalStateException("Daily usage is temporarily unavailable. Try again.", e)
             }
+
             currentStart = currentEnd
         }
 
