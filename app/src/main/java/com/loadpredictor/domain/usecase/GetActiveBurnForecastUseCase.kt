@@ -125,7 +125,8 @@ class GetActiveBurnForecastUseCase(
             val consistentForecast = if (anchoredForecast.pace != BurnPace.EXPIRED &&
                 anchoredForecast.pace != BurnPace.DEPLETED && anchoredForecast.pace != BurnPace.INSUFFICIENT_DATA &&
                 anchoredForecast.estimatedDepletionTimestamp != null) {
-                anchoredForecast.copy(pace = projectionPace(activePromo, anchoredForecast.estimatedDepletionTimestamp))
+                anchoredForecast.copy(pace = projectionPace(activePromo, anchoredForecast.estimatedDepletionTimestamp),
+                    plainLanguageSummary = buildAnchoredSummary(activePromo, anchoredForecast.estimatedDepletionTimestamp, now))
             } else anchoredForecast
             BurnForecastResult.Success(consistentForecast)
         } catch (throwable: Throwable) {
@@ -148,7 +149,7 @@ class GetActiveBurnForecastUseCase(
     ): List<UsageBucket> {
         val useCase = getDailyUsageBreakdownUseCase ?: return emptyList()
         val buckets = try {
-            useCase(promo, currentTime)
+            useCase.completedDays(promo, currentTime, DAILY_ANCHOR_WINDOW_DAYS.toLong())
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             return emptyList()
@@ -237,7 +238,9 @@ class GetActiveBurnForecastUseCase(
         depletionTime: Long,
         currentTime: Long
     ): String {
-        return if (promo.expirationTimestamp != null) {
+        return if (promo.expirationTimestamp != null && depletionTime >= promo.expirationTimestamp) {
+            "Expected to last until ${burnRateEngine.formatTimestamp(promo.expirationTimestamp, currentTime)} when ${promo.name} expires."
+        } else if (promo.expirationTimestamp != null) {
             "At current pace, ${promo.name} data will run out on ${burnRateEngine.formatTimestamp(depletionTime, currentTime)}."
         } else {
             "At current steady pace, ${promo.name} will run out on ${burnRateEngine.formatTimestamp(depletionTime, currentTime)}."

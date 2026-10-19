@@ -51,7 +51,7 @@ object WidgetStatePreferences {
                     },
                     plainLanguageSummary = preferences[KEY_SUMMARY] ?: "",
                     isNoExpiry = preferences[KEY_IS_NO_EXPIRY] ?: true,
-                    lastUpdatedMillis = preferences[KEY_LAST_UPDATED] ?: System.currentTimeMillis(),
+                    lastUpdatedMillis = preferences[KEY_LAST_UPDATED] ?: 0L,
                     estimatedDepletionTimestamp = estimatedDepletionTimestamp,
                     dailyBurnRateBytes = preferences[KEY_DAILY_BURN_RATE_BYTES] ?: 0L,
                     expirationTimestamp = expirationTimestamp

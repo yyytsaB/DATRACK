@@ -18,6 +18,15 @@ class GetDailyUsageBreakdownUseCase(
     private val timeProvider: TimeProvider = DefaultTimeProvider()
 ) {
 
+    /** Whole local calendar days for model training, independent of the screen's range. */
+    suspend fun completedDays(promo: Promo, now: Long, count: Long): List<UsageBucket> {
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val start = maxOf(promo.startTimestamp, today.minusDays(count).atStartOfDay(zone).toInstant().toEpochMilli())
+        val end = minOf(today.atStartOfDay(zone).toInstant().toEpochMilli(), promo.expirationTimestamp ?: now)
+        return if (end > start) usageRepository.queryDailyUsageBreakdown(start, end) else emptyList()
+    }
+
     /**
      * Queries daily buckets for the given promo within the specified [timeRange] at the current system time.
      */
