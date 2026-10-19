@@ -34,7 +34,7 @@ fun WidgetsScreen(viewModel: WidgetsViewModel, modifier: Modifier = Modifier) {
                     Text(forecast?.promo?.name ?: "Example promo", style = MaterialTheme.typography.titleMedium, color = TextHighEmphasis)
                     Text(if (forecast?.pace == BurnPace.EXPIRED) "Expired" else "${forecast?.let { DataFormatter.formatBytes(it.dataRemainingBytes) } ?: "8.0 GB"} left",
                         style = MaterialTheme.typography.headlineLarge, color = MintPrimary)
-                    LinearProgressIndicator(progress = { forecast?.let { (it.dataRemainingBytes.toFloat() / it.promo.totalAllowanceBytes.coerceAtLeast(1)).coerceIn(0f,1f) } ?: 0.66f }, modifier = Modifier.fillMaxWidth(), color = MintPrimary, trackColor = DarkOutline)
+                    LinearProgressIndicator(progress = { forecast?.let { (it.dataRemainingBytes.toFloat() / it.promo.totalAllowanceBytes.coerceAtLeast(1)).coerceIn(0f,1f) } ?: 0.66f }, modifier = Modifier.fillMaxWidth(), color = MintPrimary, trackColor = DarkOutline, drawStopIndicator = {})
                     Text(forecast?.let { ForecastCopy.widgetSummary(it.pace, it.estimatedDepletionTimestamp, it.promo.isNoExpiry, System.currentTimeMillis(), true) } ?: "Steady usage",
                         style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)
                 }

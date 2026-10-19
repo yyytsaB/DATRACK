@@ -41,6 +41,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -329,7 +331,7 @@ fun LiveForecastHeroSection(forecast: BurnForecast, dailyAvgBytes: Long) {
                 Text(if (expired) "Validity ended" else "${DataFormatter.formatBytes(forecast.dataRemainingBytes)} left",
                     style = MaterialTheme.typography.displaySmall, color = if (expired) PaceCriticalText else MintPrimary)
                 LinearProgressIndicator(progress = { if (expired) 0f else ratio }, modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = MintPrimary, trackColor = com.loadpredictor.presentation.theme.SurfaceLayer2)
+                    color = MintPrimary, trackColor = com.loadpredictor.presentation.theme.SurfaceLayer2, drawStopIndicator = {})
                 Text(if (expired) "${DataFormatter.formatBytes(forecast.dataRemainingBytes)} unused at expiry" else
                     "${DataFormatter.formatBytes(forecast.promo.totalAllowanceBytes - forecast.dataRemainingBytes)} used of ${DataFormatter.formatBytes(forecast.promo.totalAllowanceBytes)}",
                     style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)

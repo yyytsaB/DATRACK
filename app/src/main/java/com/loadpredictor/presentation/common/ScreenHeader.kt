@@ -7,14 +7,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.loadpredictor.presentation.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Natural height keeps titles and supporting text visible at larger Android font settings. */
 @Composable
 fun ScreenHeader(title: String, subtitle: String) {
-    TopAppBar(title = {
-        Column(Modifier.padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Surface(color = DarkBackground) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = TextHighEmphasis)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
         }
-    }, expandedHeight = 104.dp, windowInsets = WindowInsets(0, 0, 0, 0),
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground))
+    }
 }

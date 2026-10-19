@@ -111,7 +111,7 @@ internal fun DailyBreakdownRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
+    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f)
 
     Row(
         modifier = Modifier

@@ -96,14 +96,14 @@ fun InteractiveUsageChart(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = PurpleBadgeBackground,
-                        border = BorderStroke(1.dp, Color(0xFF3B2D6B))
+                        color = com.loadpredictor.presentation.theme.MintPrimaryContainer,
+                        border = null
                     ) {
                         Text(
                             text = "${formatDayLabel(selectedBucket.startTimestamp)}: ${DataFormatter.formatBytes(selectedBucket.totalBytes)}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = PurpleBadgeText,
+                            color = MintPrimary,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -165,7 +165,7 @@ fun InteractiveUsageChart(
                         val displayBuckets = buckets
                         displayBuckets.forEachIndexed { index, bucket ->
                             val isSelected = (bucket.startTimestamp == (selectedBucketTimestamp ?: buckets.lastOrNull()?.startTimestamp))
-                            val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
+                            val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f)
                             val animatedHeightFraction by animateFloatAsState(
                                 targetValue = targetFraction,
                                 animationSpec = tween(durationMillis = 200),

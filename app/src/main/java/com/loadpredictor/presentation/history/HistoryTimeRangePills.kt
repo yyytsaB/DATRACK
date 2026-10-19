@@ -12,7 +12,9 @@ fun HistoryTimeRangePills(selectedRange: HistoryTimeRange, onRangeSelected: (His
     FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         HistoryTimeRange.entries.forEach { range ->
             FilterChip(selected = range == selectedRange, onClick = { onRangeSelected(range) },
-                label = { Text(range.label) }, modifier = Modifier.heightIn(min = 48.dp))
+                label = { Text(range.label) }, modifier = Modifier.heightIn(min = 48.dp),
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = com.loadpredictor.presentation.theme.MintPrimaryContainer,
+                    selectedLabelColor = com.loadpredictor.presentation.theme.MintPrimary))
         }
     }
 }

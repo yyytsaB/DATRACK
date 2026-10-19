@@ -53,8 +53,8 @@ import com.loadpredictor.util.DataFormatter
 class LoadPredictorWidget : GlanceAppWidget() {
 
     companion object {
-        private val COMPACT_SIZE = DpSize(150.dp, 180.dp)
-        private val WIDE_SIZE = DpSize(280.dp, 180.dp)
+        private val COMPACT_SIZE = DpSize(150.dp, 220.dp)
+        private val WIDE_SIZE = DpSize(280.dp, 220.dp)
     }
 
     override var sizeMode: SizeMode = SizeMode.Responsive(
@@ -107,7 +107,7 @@ private fun WidgetRoot(state: WidgetState, isWide: Boolean) {
                 Spacer(GlanceModifier.height(8.dp))
                 Text(com.loadpredictor.presentation.common.ForecastCopy.widgetSummary(state.pace, state.estimatedDepletionTimestamp, state.isNoExpiry, System.currentTimeMillis(), isWide),
                     style = TextStyle(color = ColorProvider(com.loadpredictor.presentation.theme.TextHighEmphasis), fontSize = 12.sp), maxLines = 2)
-                if (isWide) Text(com.loadpredictor.presentation.common.ForecastCopy.updated(state.lastUpdatedMillis, System.currentTimeMillis()),
+                Text(com.loadpredictor.presentation.common.ForecastCopy.updated(state.lastUpdatedMillis, System.currentTimeMillis()),
                     style = TextStyle(color = ColorProvider(com.loadpredictor.presentation.theme.TextMediumEmphasis), fontSize = 11.sp), maxLines = 2)
             }
             else -> {

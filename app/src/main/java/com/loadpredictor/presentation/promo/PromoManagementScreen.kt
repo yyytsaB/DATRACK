@@ -32,6 +32,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,21 +85,23 @@ fun PromoManagementScreen(
         containerColor = DarkBackground,
         topBar = {
             com.loadpredictor.presentation.common.ScreenHeader("Promos", "Choose the data plan you’re tracking.")
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { showAddDialog = true },
-                containerColor = MintPrimary, contentColor = MintOnPrimary,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) }, text = { Text("Add promo") })
         }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 104.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             uiState.errorMessage?.let { message -> item { Text(message, color = PaceCritical) } }
+            item {
+                Button(onClick = { showAddDialog = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add promo")
+                }
+            }
             // SIM 1 / SIM 2 Filter Segmented Buttons (Matching tab/pill style in preview (4))
             item {
                 Row(
@@ -289,7 +293,7 @@ fun PromoItemCard(
             Text("${com.loadpredictor.util.DataFormatter.formatBytes(remaining)} ${if (expired) "unused" else "remaining"}",
                 style = MaterialTheme.typography.titleMedium, color = TextHighEmphasis)
             LinearProgressIndicator(progress = { if (expired) 0f else fraction }, Modifier.fillMaxWidth().height(6.dp),
-                color = if (isActive) MintPrimary else TextMediumEmphasis, trackColor = DarkOutline)
+                color = if (isActive) MintPrimary else TextMediumEmphasis, trackColor = DarkOutline, drawStopIndicator = {})
             Text("of ${com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes)}${if (!isActive) " · saved snapshot" else ""}",
                 style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
             HorizontalDivider(color = DarkOutlineVariant)

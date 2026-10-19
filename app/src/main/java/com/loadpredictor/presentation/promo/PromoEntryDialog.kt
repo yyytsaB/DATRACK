@@ -567,7 +567,8 @@ fun PromoEntryDialog(
  */
 @Composable
 private fun PresetPillChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected = isSelected, onClick = onClick, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
+    FilterChip(selected = isSelected, onClick = onClick, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp),
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(selectedContainerColor = MintPrimaryContainer, selectedLabelColor = MintPrimary))
 }
 
 @Composable

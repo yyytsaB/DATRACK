@@ -147,7 +147,7 @@ fun AlertsScreen(
                     // 80% Used Toggle
                     AlertToggleRow(
                         title = "80% used",
-                        subtitle = "Getting into the danger zone",
+                        subtitle = "When one fifth of your allowance remains",
                         checked = uiState.is80Enabled,
                         onCheckedChange = { viewModel.onToggle80Alert(it) }
                     )
@@ -174,8 +174,8 @@ fun AlertsScreen(
 
                     // Premature Depletion Toggle
                     AlertToggleRow(
-                        title = "Premature depletion",
-                        subtitle = "You're using data faster than usual",
+                        title = "May run out early",
+                        subtitle = "When the forecast ends before your promo expires",
                         checked = uiState.isPrematureEnabled,
                         onCheckedChange = { viewModel.onTogglePrematureAlert(it) }
                     )
