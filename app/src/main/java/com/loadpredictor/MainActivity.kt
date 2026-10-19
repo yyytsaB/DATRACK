@@ -123,6 +123,11 @@ private fun Dashboard(state: MainUiState, refresh: () -> Unit, promos: () -> Uni
                 state.forecastResult is BurnForecastResult.Error -> {
                     Text("Couldn't read usage", style = MaterialTheme.typography.headlineMedium)
                     Text((state.forecastResult as BurnForecastResult.Error).message)
+                    state.lastSuccessfulForecast?.let { previous ->
+                        Text("Last known: ${DataFormatter.formatBytes(previous.dataRemainingBytes)} for ${previous.promo.name}")
+                        Text("Stale reading · ${ForecastCopy.updated(previous.observedAt, System.currentTimeMillis())}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Button(onClick = refresh) { Text("Try again") }
                 }
                 state.forecastResult is BurnForecastResult.Success -> {

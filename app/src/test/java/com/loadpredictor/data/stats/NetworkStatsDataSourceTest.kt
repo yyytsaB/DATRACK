@@ -101,4 +101,9 @@ class NetworkStatsDataSourceTest {
         assertTrue(dataSource.queryDailyUsageBreakdown(now, now).isEmpty())
         assertTrue(dataSource.queryDailyUsageBreakdown(now + 100, now).isEmpty())
     }
+    @Test(expected = IllegalStateException::class)
+    fun `platform reading failure is not zero usage`() {
+        every { networkStatsManager.querySummaryForDevice(any(), any(), any(), any()) } throws android.os.RemoteException()
+        NetworkStatsDataSource(context, networkStatsManager).queryMobileUsageBytes(1L, 1000L)
+    }
 }

@@ -32,11 +32,9 @@ fun WidgetsScreen(viewModel: WidgetsViewModel, modifier: Modifier = Modifier) {
                         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(if (forecast == null) "Add a promo" else if (forecast.pace == com.loadpredictor.domain.model.BurnPace.EXPIRED) "Promo expired"
                                 else "${DataFormatter.formatBytes(forecast.dataRemainingBytes)} left", style = MaterialTheme.typography.headlineSmall)
-                            Text(forecast?.let { ForecastCopy.status(it.pace, it.promo.isNoExpiry) } ?: "Open DATRACK to start tracking")
-                            if (wide && forecast != null) {
-                                Text(ForecastCopy.runway(forecast.pace, forecast.estimatedDepletionTimestamp, System.currentTimeMillis()))
-                                Text(if (forecast.promo.isNoExpiry) "No expiry" else "Ends ${ForecastCopy.date(forecast.promo.expirationTimestamp!!)}")
-                            }
+                            Text(forecast?.let { ForecastCopy.widgetSummary(it.pace, it.estimatedDepletionTimestamp,
+                                it.promo.isNoExpiry, System.currentTimeMillis(), wide) } ?: "Open DATRACK to start tracking")
+                            if (wide && forecast != null) Text(ForecastCopy.updated(forecast.observedAt, System.currentTimeMillis()))
                             Text("Refresh", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                         }
                     }

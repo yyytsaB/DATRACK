@@ -34,7 +34,7 @@ fun PromoManagementScreen(viewModel: PromoViewModel, onNavigateBack: (() -> Unit
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
             state.errorMessage?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
             if (!state.isLoading && state.promos.isEmpty()) item { Text("Add your current promo to find out whether it will last.") }
-            items(state.promos.sortedByDescending { it.isActive }, key = { it.id }) { promo ->
+            items(state.promos.sortedByDescending { it.id == state.activePromo?.id }, key = { it.id }) { promo ->
                 val active = state.activePromo?.id == promo.id
                 val forecast = state.activeForecast?.takeIf { it.promo.id == promo.id }
                 val remaining = if (active && forecast != null) forecast.dataRemainingBytes else promo.remainingBytes(promo.lastSyncDataUsedBytes)

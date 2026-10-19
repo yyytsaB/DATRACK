@@ -12,6 +12,7 @@ data class MainUiState(
     val activePromo: Promo? = null,
     val forecastResult: BurnForecastResult = BurnForecastResult.NoActivePromo,
     val dailyUsageBreakdown: List<UsageBucket> = emptyList(),
+    val lastSuccessfulForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     val isLoading: Boolean = true
 )
 

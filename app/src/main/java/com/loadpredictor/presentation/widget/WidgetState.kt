@@ -38,5 +38,5 @@ sealed interface WidgetState {
     /**
      * Displayed when an unexpected forecasting or background error occurs.
      */
-    data class Error(val message: String) : WidgetState
+    data class Error(val message: String, val lastSuccessfulAt: Long = 0L) : WidgetState
 }

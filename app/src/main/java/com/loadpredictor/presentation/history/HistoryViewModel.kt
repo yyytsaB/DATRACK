@@ -1,226 +1,69 @@
 package com.loadpredictor.presentation.history
 
 import android.content.Context
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
 import com.loadpredictor.data.local.AppDatabase
-import com.loadpredictor.data.repository.PromoRepositoryImpl
-import com.loadpredictor.data.repository.UsageRepositoryImpl
-import com.loadpredictor.data.stats.NetworkStatsDataSource
-import com.loadpredictor.data.stats.UsageAccessHelper
-import com.loadpredictor.domain.model.HistoryTimeRange
-import com.loadpredictor.domain.model.Promo
-import com.loadpredictor.domain.model.UsagePatternInsight
-import com.loadpredictor.domain.usecase.GetActivePromoUseCase
-import com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase
-import com.loadpredictor.domain.usecase.GetUsagePatternInsightUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import com.loadpredictor.data.repository.*
+import com.loadpredictor.data.stats.*
+import com.loadpredictor.domain.model.*
+import com.loadpredictor.domain.usecase.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 
-/**
- * Feature-scoped ViewModel managing state, time-range querying, and interactive selection
- * for the Usage History analytics tab.
- */
 class HistoryViewModel(
     private val getActivePromoUseCase: GetActivePromoUseCase,
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase,
     private val getUsagePatternInsightUseCase: GetUsagePatternInsightUseCase = GetUsagePatternInsightUseCase()
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
-
+    private var loadJob: Job? = null
     init {
-        observeActivePromo()
-    }
-
-    /**
-     * Updates the active time-range filter (7D / 30D / Lifetime) and re-queries buckets.
-     */
-    fun setTimeRange(range: HistoryTimeRange) {
-        if (_uiState.value.selectedRange == range) return
-        _uiState.update { it.copy(selectedRange = range, isLoading = true) }
-        loadBucketsForRange(range)
-    }
-
-    /**
-     * Selects a specific daily bucket by timestamp for chart inspection and tooltip display.
-     */
-    fun selectBucket(timestamp: Long?) {
-        _uiState.update { it.copy(selectedBucketTimestamp = timestamp) }
-    }
-
-    /**
-     * Refreshes history buckets for the active promo and current time-range.
-     * Preserves [selectedBucketTimestamp] across periodic 30-second live refresh ticker ticks.
-     */
-    fun refresh() {
-        viewModelScope.launch {
-            val promo = _uiState.value.activePromo ?: try {
-                getActivePromoUseCase().first()
-            } catch (e: Exception) {
-                null
-            }
-
-            if (promo == null) {
-                _uiState.update {
-                    it.copy(
-                        activePromo = null,
-                        dailyBuckets = emptyList(),
-                        selectedBucketTimestamp = null,
-                        patternInsight = UsagePatternInsight.InsufficientData,
-                        isLoading = false
-                    )
-                }
-                return@launch
-            }
-
-            val buckets = try {
-                getDailyUsageBreakdownUseCase(promo, timeRange = _uiState.value.selectedRange)
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                _uiState.update { it.copy(errorMessage = "Usage is unavailable. Check Usage Access and try again.", isLoading = false) }
-                return@launch
-            }
-
-            val insight = getUsagePatternInsightUseCase(buckets)
-
-            _uiState.update { current ->
-                // Preserve selection if timestamp still exists in new buckets
-                val preservedTimestamp = if (current.selectedBucketTimestamp != null &&
-                    buckets.any { it.startTimestamp == current.selectedBucketTimestamp }
-                ) {
-                    current.selectedBucketTimestamp
-                } else {
-                    buckets.lastOrNull()?.startTimestamp
-                }
-
-                current.copy(
-                    activePromo = promo,
-                    dailyBuckets = buckets,
-                    errorMessage = null,
-                    selectedBucketTimestamp = preservedTimestamp,
-                    patternInsight = insight,
-                    isLoading = false
-                )
-            }
-        }
-    }
-
-    private fun observeActivePromo() {
-        getActivePromoUseCase()
+        getActivePromoUseCase().distinctUntilChangedBy { promo -> promo?.copy(lastActiveBurnRate = null, lastSyncDataUsedBytes = 0, lastSyncTimestamp = 0) }
             .onEach { promo ->
-                _uiState.update { it.copy(activePromo = promo) }
-                if (promo != null) {
-                    loadBucketsForRange(_uiState.value.selectedRange, promo)
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            dailyBuckets = emptyList(),
-                            selectedBucketTimestamp = null,
-                            patternInsight = UsagePatternInsight.InsufficientData,
-                            isLoading = false
-                        )
-                    }
-                }
-            }
-            .catch {
-                _uiState.update {
-                    it.copy(
-                        activePromo = null,
-                        dailyBuckets = emptyList(),
-                        selectedBucketTimestamp = null,
-                        patternInsight = UsagePatternInsight.InsufficientData,
-                        isLoading = false
-                    )
-                }
-            }
+                loadJob?.cancel()
+                _uiState.update { it.copy(activePromo = promo, dailyBuckets = emptyList(), selectedBucketTimestamp = null) }
+                refresh()
+            }.catch { error -> _uiState.update { it.copy(errorMessage = error.localizedMessage, isLoading = false) } }
             .launchIn(viewModelScope)
     }
-
-    private fun loadBucketsForRange(
-        range: HistoryTimeRange,
-        currentPromo: Promo? = _uiState.value.activePromo
-    ) {
-        viewModelScope.launch {
-            val promo = currentPromo ?: try {
-                getActivePromoUseCase().first()
-            } catch (e: Exception) {
-                null
-            }
-
+    fun setTimeRange(range: HistoryTimeRange) {
+        if (_uiState.value.selectedRange == range) return
+        _uiState.update { it.copy(selectedRange = range, selectedBucketTimestamp = null) }
+        refresh()
+    }
+    fun selectBucket(timestamp: Long?) { _uiState.update { it.copy(selectedBucketTimestamp = timestamp) } }
+    fun refresh() {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            val promo = _uiState.value.activePromo ?: getActivePromoUseCase().first()
             if (promo == null) {
-                _uiState.update {
-                    it.copy(
-                        dailyBuckets = emptyList(),
-                        patternInsight = UsagePatternInsight.InsufficientData,
-                        isLoading = false
-                    )
-                }
+                _uiState.update { it.copy(activePromo = null, dailyBuckets = emptyList(), selectedBucketTimestamp = null,
+                    patternInsight = UsagePatternInsight.InsufficientData, errorMessage = null, isLoading = false) }
                 return@launch
             }
-
-            val buckets = try {
-                getDailyUsageBreakdownUseCase(promo, timeRange = range)
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
+            val range = _uiState.value.selectedRange
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val buckets = getDailyUsageBreakdownUseCase(promo, timeRange = range)
+                _uiState.update { current -> current.copy(activePromo = promo, dailyBuckets = buckets,
+                    selectedBucketTimestamp = current.selectedBucketTimestamp?.takeIf { selected -> buckets.any { it.startTimestamp == selected } }
+                        ?: buckets.lastOrNull()?.startTimestamp,
+                    patternInsight = getUsagePatternInsightUseCase(buckets), isLoading = false, errorMessage = null) }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
                 _uiState.update { it.copy(errorMessage = "Usage is unavailable. Check Usage Access and try again.", isLoading = false) }
-                return@launch
-            }
-
-            val insight = getUsagePatternInsightUseCase(buckets)
-
-            _uiState.update { current ->
-                val preservedTimestamp = if (current.selectedBucketTimestamp != null &&
-                    buckets.any { it.startTimestamp == current.selectedBucketTimestamp }
-                ) {
-                    current.selectedBucketTimestamp
-                } else {
-                    buckets.lastOrNull()?.startTimestamp
-                }
-
-                current.copy(
-                    activePromo = promo,
-                    dailyBuckets = buckets,
-                    errorMessage = null,
-                    selectedBucketTimestamp = preservedTimestamp,
-                    patternInsight = insight,
-                    isLoading = false
-                )
             }
         }
     }
-
     companion object {
-        fun provideFactory(context: Context): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val appContext = context.applicationContext
-                    val database = AppDatabase.getInstance(appContext)
-                    val promoRepo = PromoRepositoryImpl(database.promoDao())
-                    val usageHelper = UsageAccessHelper(appContext)
-                    val networkStatsDataSource = NetworkStatsDataSource(appContext)
-                    val usageRepo = UsageRepositoryImpl(usageHelper, networkStatsDataSource)
-
-                    val getActivePromoUseCase = GetActivePromoUseCase(promoRepo)
-                    val getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepo)
-                    val getUsagePatternInsightUseCase = GetUsagePatternInsightUseCase()
-
-                    return HistoryViewModel(
-                        getActivePromoUseCase = getActivePromoUseCase,
-                        getDailyUsageBreakdownUseCase = getDailyUsageBreakdownUseCase,
-                        getUsagePatternInsightUseCase = getUsagePatternInsightUseCase
-                    ) as T
-                }
+        fun provideFactory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val app = context.applicationContext
+                val promo = PromoRepositoryImpl(AppDatabase.getInstance(app).promoDao())
+                val usage = UsageRepositoryImpl(UsageAccessHelper(app), NetworkStatsDataSource(app))
+                return HistoryViewModel(GetActivePromoUseCase(promo), GetDailyUsageBreakdownUseCase(usage)) as T
             }
+        }
     }
 }

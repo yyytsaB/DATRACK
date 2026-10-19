@@ -17,6 +17,8 @@ import com.loadpredictor.presentation.widget.WidgetState
 import com.loadpredictor.presentation.widget.WidgetStatePreferences
 import com.loadpredictor.presentation.widget.WidgetSyncHelper
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Background WorkManager worker responsible for:
@@ -29,7 +31,17 @@ class UsageSyncWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(context, workerParams) {
 
-    override suspend fun doWork(): Result {
+    companion object { private val syncMutex = Mutex() }
+
+    override suspend fun doWork(): Result = syncMutex.withLock {
+        try { synchronizeUsage() }
+        catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            if (runAttemptCount < 5) Result.retry() else Result.failure()
+        }
+    }
+
+    private suspend fun synchronizeUsage(): Result {
         val usageHelper = UsageAccessHelper(context)
         val database = AppDatabase.getInstance(context)
         val promoRepo = PromoRepositoryImpl(database.promoDao())

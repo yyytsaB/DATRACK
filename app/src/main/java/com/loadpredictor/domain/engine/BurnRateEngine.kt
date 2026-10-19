@@ -263,7 +263,7 @@ class BurnRateEngine {
     /**
      * Formats an epoch timestamp into a natural day and time format (e.g., "Tuesday at 4:15 PM" or "Oct 1 at 3:00 PM" or "Mar 3, 2027 at 3:16 PM").
      */
-    fun formatTimestamp(timestamp: Long, currentTime: Long = System.currentTimeMillis()): String {
+    fun formatTimestamp(timestamp: Long, currentTime: Long): String {
         return com.loadpredictor.util.DataFormatter.formatDepletionDateTime(timestamp, currentTime)
     }
 }

@@ -26,7 +26,7 @@ import com.loadpredictor.util.DataFormatter
 
 /** Content-first, tall enough to wrap essential text at large font settings. */
 class LoadPredictorWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(DpSize(150.dp, 240.dp), DpSize(280.dp, 240.dp)))
+    override val sizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = PromoRepositoryImpl(AppDatabase.getInstance(context).promoDao())
@@ -37,7 +37,7 @@ class LoadPredictorWidget : GlanceAppWidget() {
         provideContent {
             val prefs = currentState<Preferences>()
             val state = WidgetStatePreferences.readState(prefs)
-            WidgetContent(state, LocalSize.current.width >= 280.dp)
+            WidgetContent(state, LocalSize.current.width >= 240.dp)
         }
     }
 }
@@ -53,38 +53,36 @@ private fun WidgetContent(state: WidgetState, wide: Boolean) {
         verticalAlignment = Alignment.Vertical.CenterVertically) {
         when (state) {
             is WidgetState.Success -> {
-                val expired = state.pace == BurnPace.EXPIRED
-                Text(if (expired) "Promo expired" else "${DataFormatter.formatBytes(state.remainingBytes)} left",
-                    style = TextStyle(color = ink, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+                Text(if (state.pace == BurnPace.EXPIRED) "Promo expired" else "${DataFormatter.formatBytes(state.remainingBytes)} left",
+                    style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
                 Spacer(GlanceModifier.height(6.dp))
-                Text(ForecastCopy.status(state.pace, state.isNoExpiry), style = TextStyle(color = mint, fontSize = 14.sp))
+                Text(ForecastCopy.widgetSummary(state.pace, state.estimatedDepletionTimestamp, state.isNoExpiry,
+                    System.currentTimeMillis(), wide), style = TextStyle(color = mint, fontSize = 14.sp))
                 if (wide) {
                     Spacer(GlanceModifier.height(6.dp))
-                    Text(ForecastCopy.runway(state.pace, state.estimatedDepletionTimestamp, System.currentTimeMillis()),
-                        style = TextStyle(color = ink, fontSize = 14.sp))
-                    Text(if (state.isNoExpiry) "No expiry" else "Ends ${ForecastCopy.date(state.expirationTimestamp!!)}",
+                    Text(ForecastCopy.updated(state.lastUpdatedMillis, System.currentTimeMillis()),
                         style = TextStyle(color = secondary, fontSize = 12.sp))
                 }
-                Spacer(GlanceModifier.height(8.dp))
-                Text(ForecastCopy.updated(state.lastUpdatedMillis, System.currentTimeMillis()), style = TextStyle(color = secondary, fontSize = 12.sp))
             }
             WidgetState.NoActivePromo -> {
                 Text("Add a promo", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
-                Text("Tap to start tracking", style = TextStyle(color = secondary, fontSize = 14.sp))
+
             }
             WidgetState.PermissionRequired -> {
                 Text("Allow Usage Access", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
-                Text("Tap to open DATRACK", style = TextStyle(color = secondary, fontSize = 14.sp))
+
             }
             is WidgetState.Error -> {
                 Text("Reading unavailable", style = TextStyle(color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold))
-                Text("Open DATRACK or try Refresh", style = TextStyle(color = secondary, fontSize = 14.sp))
+
             }
         }
         Spacer(GlanceModifier.height(8.dp))
-        Box(GlanceModifier.fillMaxWidth().height(48.dp).clickable(actionRunCallback<RefreshWidgetCallback>()),
+        val action = if (state is WidgetState.NoActivePromo || state is WidgetState.PermissionRequired)
+            actionStartActivity<MainActivity>() else actionRunCallback<RefreshWidgetCallback>()
+        Box(GlanceModifier.fillMaxWidth().height(48.dp).clickable(action),
             contentAlignment = Alignment.CenterStart) {
-            Text("Refresh", style = TextStyle(color = mint, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+            Text(if (state is WidgetState.NoActivePromo || state is WidgetState.PermissionRequired) "Open app" else "Refresh", style = TextStyle(color = mint, fontSize = 14.sp, fontWeight = FontWeight.Bold))
         }
     }
 }

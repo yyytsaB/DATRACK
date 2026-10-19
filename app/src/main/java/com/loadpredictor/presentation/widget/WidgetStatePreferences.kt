@@ -59,7 +59,7 @@ object WidgetStatePreferences {
             }
             TYPE_NO_ACTIVE_PROMO -> WidgetState.NoActivePromo
             TYPE_PERMISSION_REQUIRED -> WidgetState.PermissionRequired
-            TYPE_ERROR -> WidgetState.Error(preferences[KEY_ERROR_MESSAGE] ?: "Forecast unavailable")
+            TYPE_ERROR -> WidgetState.Error(preferences[KEY_ERROR_MESSAGE] ?: "Forecast unavailable", preferences[KEY_LAST_UPDATED] ?: 0L)
             else -> WidgetState.NoActivePromo
         }
     }

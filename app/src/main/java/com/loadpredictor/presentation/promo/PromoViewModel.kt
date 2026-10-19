@@ -134,6 +134,7 @@ class PromoViewModel(
                 onPromoMutated?.invoke()
                 onSuccess(savedId)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 val msg = e.localizedMessage ?: "Failed to save promo"
                 _uiState.update { it.copy(errorMessage = msg) }
                 onError(msg)
@@ -145,16 +146,26 @@ class PromoViewModel(
 
     fun selectActivePromo(promoId: Long) {
         viewModelScope.launch {
-            promoRepository.setActivePromo(promoId)
-            onPromoMutated?.invoke()
+            try {
+                promoRepository.setActivePromo(promoId)
+                onPromoMutated?.invoke()
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _uiState.update { it.copy(errorMessage = "Couldn't change the active promo. Try again.") }
+            }
         }
     }
 
     fun deletePromo(promo: Promo) {
         viewModelScope.launch {
-            notificationPreferences?.clearThresholdsForPromo(promo.id)
-            promoRepository.deletePromo(promo)
-            onPromoMutated?.invoke()
+            try {
+                promoRepository.deletePromo(promo)
+                notificationPreferences?.clearThresholdsForPromo(promo.id)
+                onPromoMutated?.invoke()
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _uiState.update { it.copy(errorMessage = "Couldn't delete the promo. Try again.") }
+            }
         }
     }
 

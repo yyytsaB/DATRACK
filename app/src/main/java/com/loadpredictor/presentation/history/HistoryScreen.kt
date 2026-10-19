@@ -39,7 +39,7 @@ fun HistoryScreen(viewModel: HistoryViewModel, modifier: Modifier = Modifier) {
             } }
             item {
                 Text("${DataFormatter.formatBytes(state.totalBurntBytes)} measured", style = MaterialTheme.typography.headlineMedium)
-                Text("${DataFormatter.formatBytes(state.dailyAverageBytes)} per completed day", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (state.dailyBuckets.any { it.isCompletedDay(System.currentTimeMillis()) }) "${DataFormatter.formatBytes(state.dailyAverageBytes)} per completed day" else "No completed day yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (state.patternInsight is UsagePatternInsight.Pattern) item { Text((state.patternInsight as UsagePatternInsight.Pattern).summary) }
             item { InteractiveUsageChart(state.dailyBuckets, state.selectedBucketTimestamp, { viewModel.selectBucket(it) }) }

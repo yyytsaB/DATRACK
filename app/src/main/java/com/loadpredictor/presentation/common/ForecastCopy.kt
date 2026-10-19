@@ -26,6 +26,17 @@ object ForecastCopy {
             else -> "Less than 1 day left"
         }
     }
+    fun widgetSummary(pace: BurnPace, depletion: Long?, noExpiry: Boolean, now: Long, wide: Boolean): String = when (pace) {
+        BurnPace.EXPIRED -> "Expired"
+        BurnPace.DEPLETED -> "Used up"
+        BurnPace.INSUFFICIENT_DATA -> "Learning"
+        else -> if (!wide) {
+            if (noExpiry) "Steady" else if (pace == BurnPace.BURNING_FAST) "Runs out early" else "Will last"
+        } else {
+            val duration = runway(pace, depletion, now).removePrefix("About ").removeSuffix(" left")
+            duration + if (noExpiry) " left" else if (pace == BurnPace.BURNING_FAST) " · early" else " · will last"
+        }
+    }
     fun updated(at: Long, now: Long): String {
         if (at <= 0) return "No reading yet"
         val minutes = ((now - at).coerceAtLeast(0L) / 60_000L)

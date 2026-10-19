@@ -17,7 +17,7 @@ import com.loadpredictor.domain.model.isCompletedDay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.transformLatest
 
 /**
  * UseCase coordinating active promo lookup, mobile usage data queries,
@@ -247,8 +247,9 @@ class GetActiveBurnForecastUseCase(
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     operator fun invoke(): Flow<BurnForecastResult> = promoRepository.getActivePromo()
-        .transform { activePromo ->
+        .transformLatest { activePromo ->
             emit(execute(activePromo))
         }
         .catch { throwable ->

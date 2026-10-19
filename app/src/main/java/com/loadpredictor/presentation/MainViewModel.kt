@@ -37,6 +37,8 @@ class MainViewModel(
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) : ViewModel() {
 
+    private var refreshJob: kotlinx.coroutines.Job? = null
+
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
@@ -63,11 +65,13 @@ class MainViewModel(
      * Atomically refreshes both the live forecast and daily usage breakdown.
      */
     fun refresh() {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             checkPermission()
-            val promo = _uiState.value.activePromo ?: try {
+            val promo = try {
                 getActivePromoUseCase().first()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 null
             }
 
@@ -87,6 +91,7 @@ class MainViewModel(
                 try {
                     getDailyUsageBreakdownUseCase(promo)
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     emptyList()
                 }
             } else {
@@ -103,6 +108,7 @@ class MainViewModel(
                     )
                     is BurnForecastResult.Success -> current.copy(
                         activePromo = forecastResult.forecast.promo,
+                        lastSuccessfulForecast = forecastResult.forecast,
                         forecastResult = forecastResult,
                         dailyUsageBreakdown = dailyBreakdown,
                         isLoading = false
@@ -130,7 +136,8 @@ class MainViewModel(
                     emptyList()
                 }
                 _uiState.update { current ->
-                    current.copy(activePromo = promo, dailyUsageBreakdown = daily)
+                    current.copy(activePromo = promo, dailyUsageBreakdown = daily,
+                        lastSuccessfulForecast = current.lastSuccessfulForecast?.takeIf { it.promo.id == promo?.id })
                 }
             }
             .catch {
@@ -156,6 +163,7 @@ class MainViewModel(
                         is BurnForecastResult.Success -> {
                             current.copy(
                                 activePromo = result.forecast.promo,
+                                lastSuccessfulForecast = result.forecast,
                                 forecastResult = result,
                                 isLoading = false
                             )

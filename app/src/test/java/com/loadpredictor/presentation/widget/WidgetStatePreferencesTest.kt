@@ -35,10 +35,12 @@ class WidgetStatePreferencesTest {
         val prefs = mockk<Preferences>()
         every { prefs[WidgetStatePreferences.KEY_STATE_TYPE] } returns WidgetStatePreferences.TYPE_ERROR
         every { prefs[WidgetStatePreferences.KEY_ERROR_MESSAGE] } returns "Network stats unavailable"
+        every { prefs[WidgetStatePreferences.KEY_LAST_UPDATED] } returns 123L
 
         val result = WidgetStatePreferences.readState(prefs)
         assertTrue(result is WidgetState.Error)
         assertEquals("Network stats unavailable", (result as WidgetState.Error).message)
+        assertEquals(123L, result.lastSuccessfulAt)
     }
 
     @Test
