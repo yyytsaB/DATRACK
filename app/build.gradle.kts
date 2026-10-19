@@ -20,6 +20,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".audit"
+            versionNameSuffix = "-audit"
+            resValue("string", "app_name", "DATRACK Preview")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
