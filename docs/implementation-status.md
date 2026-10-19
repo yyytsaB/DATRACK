@@ -1,3 +1,15 @@
+# UI rollback requested by user
+
+The original appearance is restored from `fc927c1`, retaining the core feature fixes and reliability work. This supersedes the UI redesign statements in the historical milestone record below.
+
+Restored: dashboard ring/structure, dark mint palette, original font, five-tab navigation, promo cards and sheet styling, Alerts/History styling, widget gallery, and original ring/sparkline widget layouts and sizing.
+
+Retained: expiry logic and exact-expiry input, offset accounting, anchored forecast/risk consistency, complete-day sampling, notification outcome handling, serialized workers, cancellation/stale recovery, saved forms/navigation, visible save errors, protected deletion, full-range accessible chart, lazy history rows, isolated builds and all regression tests. The widget still has an actual refresh control and concise ETA wording. No domain/data/worker code was reverted.
+
+The earlier redesign's adaptive navigation/light theme were appearance changes and have been removed. Large-font/device certification needs to be repeated against the restored UI rather than inherited from the rejected redesign.
+
+---
+
 # Implementation status — 20 October 2026
 
 ## Committed milestones

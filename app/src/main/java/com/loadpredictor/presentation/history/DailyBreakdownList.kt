@@ -105,7 +105,7 @@ fun DailyBreakdownList(
 }
 
 @Composable
-private fun DailyBreakdownRow(
+internal fun DailyBreakdownRow(
     bucket: UsageBucket,
     maxBytes: Long,
     isSelected: Boolean,

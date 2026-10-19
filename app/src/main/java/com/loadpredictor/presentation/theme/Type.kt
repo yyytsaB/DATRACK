@@ -23,7 +23,13 @@ private val OutfitFontName = GoogleFont("Outfit")
 /**
  * Outfit font family supporting standard, medium, semibold, and bold weights with system fallback.
  */
-val OutfitFontFamily = FontFamily.SansSerif
+val OutfitFontFamily = FontFamily(
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Normal),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Medium),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.SemiBold),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Bold),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.ExtraBold)
+)
 
 /**
  * App-wide Material 3 Typography utilizing the Outfit font family.

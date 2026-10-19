@@ -1,112 +1,736 @@
 package com.loadpredictor.presentation.promo
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.loadpredictor.domain.model.Promo
+import androidx.compose.ui.unit.sp
 import com.loadpredictor.domain.model.SimSlot
-import java.text.DateFormat
-import java.util.Calendar
+import com.loadpredictor.presentation.theme.BorderHighlight
+import com.loadpredictor.presentation.theme.MintOnPrimary
+import com.loadpredictor.presentation.theme.MintPrimary
+import com.loadpredictor.presentation.theme.MintPrimaryContainer
+import com.loadpredictor.presentation.theme.PaceCritical
+import com.loadpredictor.presentation.theme.SurfaceLayer1
+import com.loadpredictor.presentation.theme.SurfaceLayer2
+import com.loadpredictor.presentation.theme.SurfaceRecessed
+import com.loadpredictor.presentation.theme.TextHighEmphasis
+import com.loadpredictor.presentation.theme.TextLowEmphasis
+import com.loadpredictor.presentation.theme.TextMediumEmphasis
 
 enum class DataUnit(val multiplier: Long, val label: String) {
-    GB(1024L * 1024L * 1024L, "GB"), MB(1024L * 1024L, "MB")
+    GB(1024L * 1024L * 1024L, "GB"),
+    MB(1024L * 1024L, "MB")
 }
 
+/**
+ * 1-to-1 exact replica of the Add/Configure Promo Modal Bottom Sheet matching preview (4).webp:
+ * - Elevated Bottom Sheet with dark surface (#181F2C) & top rounded 28dp corners
+ * - Drag handle indicator
+ * - Quick presets pill grid (GigaSurf 99, GigaSurf 149, Giga Video 50, Magic Data, GoSURF 50, Custom)
+ * - Allowance rounded card field
+ * - Validity rounded card field (with No Expiration option)
+ * - Already used (optional) rounded card field
+ * - SIM Slot selector
+ * - Electric Mint full-width "Save Promo" pill action button
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PromoEntryDialog(
     onDismissRequest: () -> Unit,
-    promoToEdit: Promo? = null,
+    promoToEdit: com.loadpredictor.domain.model.Promo? = null,
     saveError: String? = null,
     isSaving: Boolean = false,
-    onSavePromo: (Long, String, Long, Long, Long?, Long, SimSlot, Boolean, Promo?) -> Unit
+    onSavePromo: (
+        id: Long,
+        name: String,
+        allowanceBytes: Long,
+        startTimestamp: Long,
+        expirationTimestamp: Long?,
+        initialUsageOffsetBytes: Long,
+        simSlot: SimSlot,
+        isActive: Boolean,
+        existingPromo: com.loadpredictor.domain.model.Promo?
+    ) -> Unit
 ) {
-    val context = LocalContext.current
-    val id = promoToEdit?.id ?: 0L
-    var name by rememberSaveable(id) { mutableStateOf(promoToEdit?.name ?: "My promo") }
-    var amount by rememberSaveable(id) { mutableStateOf(promoToEdit?.let { (it.totalAllowanceBytes / 1073741824.0).toString() } ?: "2") }
-    var used by rememberSaveable(id) { mutableStateOf(promoToEdit?.let { (it.initialUsageOffsetBytes / 1073741824.0).toString() } ?: "0") }
-    var noExpiry by rememberSaveable(id) { mutableStateOf(promoToEdit?.isNoExpiry ?: false) }
-    var expiry by rememberSaveable(id) { mutableLongStateOf(promoToEdit?.expirationTimestamp ?: (System.currentTimeMillis() + 7 * 86400000L)) }
-    var sim by rememberSaveable(id) { mutableStateOf(promoToEdit?.simSlot ?: SimSlot.SIM_1) }
-    var error by rememberSaveable(id) { mutableStateOf<String?>(null) }
-    ModalBottomSheet(onDismissRequest = onDismissRequest,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(if (promoToEdit == null) "Add your promo" else "Edit promo", style = MaterialTheme.typography.headlineSmall)
-            Text("Track your general data allowance. Carrier-specific bonus and unlimited app data are not separated.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (promoToEdit == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PromoPresets.ALL_PRESETS.forEach { preset ->
-                    SuggestionChip(onClick = {
-                        name = preset.title
-                        amount = (preset.allowanceBytes / 1073741824.0).toString()
-                        noExpiry = preset.durationDays == null
-                        expiry = System.currentTimeMillis() + (preset.durationDays ?: 7) * 86400000L
-                    }, label = { Text(preset.title) })
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var exactExpiry by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Long?>(promoToEdit?.expirationTimestamp) }
+    val isEditMode = promoToEdit != null
+    val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val matchingPreset = remember(promoToEdit) {
+        promoToEdit?.let { promo ->
+            PromoPresets.ALL_PRESETS.firstOrNull { it.title.equals(promo.name, ignoreCase = true) }
+        }
+    }
+
+    val initialAllowancePair = remember(promoToEdit) {
+        if (promoToEdit != null) {
+            val gb = promoToEdit.totalAllowanceBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+            if (gb >= 1.0) {
+                val str = if (gb == gb.toLong().toDouble()) gb.toLong().toString() else "%.2f".format(gb).trimEnd('0').trimEnd('.')
+                Pair(str, DataUnit.GB)
+            } else {
+                val mb = promoToEdit.totalAllowanceBytes / (1024 * 1024)
+                Pair(mb.toString(), DataUnit.MB)
+            }
+        } else {
+            Pair("2", DataUnit.GB)
+        }
+    }
+
+    val initialDurationDays = remember(promoToEdit) {
+        if (promoToEdit?.expirationTimestamp != null) {
+            val days = maxOf(1L, (promoToEdit.expirationTimestamp - promoToEdit.startTimestamp) / (24L * 3_600_000L))
+            days.toString()
+        } else {
+            "7"
+        }
+    }
+
+    var selectedPresetTitle by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf<String?>(if (isEditMode) matchingPreset?.title else "GigaSurf 99")
+    }
+    var promoName by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(promoToEdit?.name ?: "GigaSurf 99")
+    }
+    var allowanceValueStr by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialAllowancePair.first) }
+    var selectedUnit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialAllowancePair.second) }
+    var usedValueStr by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(promoToEdit?.let { (it.initialUsageOffsetBytes / 1048576.0).toString() } ?: "") }
+    var usedUnit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(DataUnit.MB) }
+    var isNoExpiry by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(promoToEdit?.isNoExpiry ?: false)
+    }
+    var durationDaysStr by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialDurationDays) }
+    var selectedSimSlot by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(promoToEdit?.simSlot ?: SimSlot.SIM_1)
+    }
+    var setAsActive by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(promoToEdit?.isActive ?: true)
+    }
+    var validationError by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun applyPreset(preset: PromoPreset) {
+        selectedPresetTitle = preset.title
+        promoName = preset.title
+        val gb = preset.allowanceBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+        allowanceValueStr = if (gb >= 1.0) gb.toInt().toString() else (preset.allowanceBytes / (1024 * 1024)).toString()
+        selectedUnit = if (gb >= 1.0) DataUnit.GB else DataUnit.MB
+        isNoExpiry = (preset.durationDays == null)
+        durationDaysStr = preset.durationDays?.toString() ?: ""
+        selectedSimSlot = preset.defaultSimSlot
+        exactExpiry = null
+        validationError = null
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        containerColor = Color(0xFF161C28),
+        scrimColor = Color.Black.copy(alpha = 0.65f),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .background(Color(0xFF374151), CircleShape)
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Header: Title
+            Text(
+                text = if (isEditMode) "Edit Promo" else "Add Promo",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextHighEmphasis
+            )
+
+            // Section 1: Quick Presets
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Quick presets",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextMediumEmphasis
+                )
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PromoPresets.ALL_PRESETS.forEach { preset ->
+                        val isSelected = (selectedPresetTitle == preset.title)
+                        PresetPillChip(
+                            label = preset.title,
+                            isSelected = isSelected,
+                            onClick = { applyPreset(preset) }
+                        )
+                    }
+
+                    // Custom preset chip
+                    val isCustomSelected = (selectedPresetTitle == null)
+                    PresetPillChip(
+                        label = "Custom",
+                        isSelected = isCustomSelected,
+                        onClick = {
+                            selectedPresetTitle = null
+                            if (!isEditMode) promoName = ""
+                            validationError = null
+                        }
+                    )
                 }
             }
-            OutlinedTextField(name, { name = it; error = null }, label = { Text("Promo name") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(amount, { amount = it; error = null }, label = { Text("Total allowance (GB)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(used, { used = it; error = null }, label = { Text("Already used before tracking (GB)") },
-                supportingText = { Text("Exclude data measured since you started tracking this promo.") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("No expiry", Modifier.weight(1f).padding(top = 12.dp))
-                Switch(noExpiry, { noExpiry = it })
-            }
-            if (!noExpiry) {
-                Text("Actual promo expiry", style = MaterialTheme.typography.titleMedium)
-                Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(java.util.Date(expiry)))
-                OutlinedButton(onClick = {
-                    val cal = Calendar.getInstance().apply { timeInMillis = expiry }
-                    DatePickerDialog(context, { _, year, month, day ->
-                        cal.set(year, month, day)
-                        TimePickerDialog(context, { _, hour, minute ->
-                            cal.set(Calendar.HOUR_OF_DAY, hour); cal.set(Calendar.MINUTE, minute)
-                            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
-                            expiry = cal.timeInMillis
-                        }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show()
-                    }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-                }) { Text("Choose date and time") }
-                Text("Already subscribed? Enter when your carrier says the promo ends, not its original duration.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text("Manual SIM context", style = MaterialTheme.typography.titleMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SimSlot.entries.forEach { slot -> FilterChip(selected = sim == slot, onClick = { sim = slot },
-                    label = { Text(if (slot == SimSlot.SIM_1) "SIM 1" else "SIM 2") }) }
-            }
-            Text("Android reports total mobile usage across SIMs. This label does not switch your phone's mobile-data SIM.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            (error ?: saveError)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-            Button(enabled = !isSaving, modifier = Modifier.fillMaxWidth(), onClick = {
-                val total = amount.toDoubleOrNull()
-                val offset = used.toDoubleOrNull()
-                val now = System.currentTimeMillis()
-                val start = promoToEdit?.startTimestamp ?: now
-                when {
-                    name.isBlank() -> error = "Enter a promo name."
-                    total == null || !total.isFinite() || total <= 0 || total > Long.MAX_VALUE / 1073741824.0 -> error = "Enter a valid positive allowance."
-                    offset == null || !offset.isFinite() || offset < 0 || offset > total -> error = "Already used must be between zero and the total allowance."
-                    !noExpiry && expiry <= start -> error = "Expiry must be after tracking started."
-                    else -> onSavePromo(id, name.trim(), (total * 1073741824).toLong(), start,
-                        if (noExpiry) null else expiry, (offset * 1073741824).toLong(), sim,
-                        promoToEdit?.isActive ?: true, promoToEdit)
+
+            // Custom Promo Name Field (if Custom selected or name differs from preset)
+            if (selectedPresetTitle == null) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Promo Name",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMediumEmphasis
+                    )
+                    StyledInputFieldBox(
+                        value = promoName,
+                        onValueChange = {
+                            promoName = it
+                            validationError = null
+                        },
+                        placeholder = "e.g. Smart Magic Data 399",
+                        keyboardType = KeyboardType.Text
+                    )
                 }
-            }) { Text(if (isSaving) "Saving…" else if (promoToEdit == null) "Start tracking" else "Save changes") }
+            }
+
+            // Section 2: Allowance
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Allowance",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextMediumEmphasis
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        StyledInputFieldBox(
+                            value = allowanceValueStr,
+                            onValueChange = {
+                                allowanceValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                validationError = null
+                            },
+                            placeholder = "8",
+                            keyboardType = KeyboardType.Decimal
+                        )
+                    }
+
+                    UnitSegmentPills(
+                        selectedUnit = selectedUnit,
+                        onUnitSelected = { selectedUnit = it }
+                    )
+                }
+            }
+
+            // Section 3: Validity
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Validity",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMediumEmphasis
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "No Expiration",
+                            fontSize = 11.sp,
+                            color = if (isNoExpiry) MintPrimary else TextLowEmphasis,
+                            fontWeight = if (isNoExpiry) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Switch(
+                            checked = isNoExpiry,
+                            onCheckedChange = {
+                                isNoExpiry = it
+                                validationError = null
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MintOnPrimary,
+                                checkedTrackColor = MintPrimary,
+                                uncheckedThumbColor = TextMediumEmphasis,
+                                uncheckedTrackColor = SurfaceRecessed
+                            ),
+                            modifier = Modifier.height(24.dp)
+                        )
+                    }
+                }
+
+                if (!isNoExpiry) {
+                    StyledInputFieldBox(
+                        value = durationDaysStr,
+                        onValueChange = {
+                            durationDaysStr = it.filter { ch -> ch.isDigit() }
+                                exactExpiry = null
+                            validationError = null
+                        },
+                        placeholder = "7",
+                        suffix = if (isEditMode) "days total validity" else "days from today",
+                        keyboardType = KeyboardType.Number
+                    )
+                } else {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFF1E2636),
+                        border = BorderStroke(1.dp, Color(0xFF2B364A))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Text(
+                                text = "Non-expiring / Data cap only",
+                                fontSize = 14.sp,
+                                color = MintPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!isNoExpiry) {
+                exactExpiry?.let { Text("Actual expiry: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it))}", color = TextMediumEmphasis, fontSize = 12.sp) }
+                androidx.compose.material3.TextButton(onClick = {
+                    val cal = java.util.Calendar.getInstance().apply { timeInMillis = exactExpiry ?: (System.currentTimeMillis() + 7 * 86400000L) }
+                    android.app.DatePickerDialog(context, { _, y, m, d ->
+                        cal.set(y, m, d)
+                        android.app.TimePickerDialog(context, { _, h, minute ->
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, h); cal.set(java.util.Calendar.MINUTE, minute)
+                            cal.set(java.util.Calendar.SECOND, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
+                            exactExpiry = cal.timeInMillis
+                        }, cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE), false).show()
+                    }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show()
+                }) { Text("Set actual expiry date and time", color = MintPrimary) }
+            }
+            // Section 4: Already used (creation or baseline correction)
+            run {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Already used (optional)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMediumEmphasis
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            StyledInputFieldBox(
+                                value = usedValueStr,
+                                onValueChange = {
+                                    usedValueStr = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                    validationError = null
+                                },
+                                placeholder = "0 — for mid-cycle setup",
+                                keyboardType = KeyboardType.Decimal
+                            )
+                        }
+
+                        UnitSegmentPills(
+                            selectedUnit = usedUnit,
+                            onUnitSelected = { usedUnit = it }
+                        )
+                    }
+                }
+            }
+
+            // Section 5: SIM Slot Selection
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "SIM Slot",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextMediumEmphasis
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SimSlotPillButton(
+                        title = "SIM 1",
+                        isSelected = (selectedSimSlot == SimSlot.SIM_1),
+                        onClick = { selectedSimSlot = SimSlot.SIM_1 },
+                        modifier = Modifier.weight(1f)
+                    )
+                    SimSlotPillButton(
+                        title = "SIM 2",
+                        isSelected = (selectedSimSlot == SimSlot.SIM_2),
+                        onClick = { selectedSimSlot = SimSlot.SIM_2 },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Validation Error Message
+            if (validationError != null || saveError != null) {
+                Text(
+                    text = validationError ?: saveError.orEmpty(),
+                    color = PaceCritical,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Section 6: Save Promo Action Button
+            Button(
+                enabled = !isSaving,
+                onClick = {
+                    val finalPromoName = promoName.ifBlank { selectedPresetTitle ?: "My Promo" }
+                    val numAllowance = allowanceValueStr.toDoubleOrNull()
+                    if (numAllowance == null || !numAllowance.isFinite() || numAllowance <= 0.0 || numAllowance > Long.MAX_VALUE.toDouble() / selectedUnit.multiplier) {
+                        validationError = "Please enter a valid positive allowance."
+                        return@Button
+                    }
+                    val allowanceBytes = (numAllowance * selectedUnit.multiplier).toLong()
+
+                    val usedBytes = if (usedValueStr.isNotBlank()) {
+                        val value = usedValueStr.toDoubleOrNull()
+                        if (value == null || !value.isFinite() || value < 0 || value > Long.MAX_VALUE.toDouble() / usedUnit.multiplier) {
+                            validationError = "Enter a valid already-used amount."
+                            return@Button
+                        }
+                        val bytes = (value * usedUnit.multiplier).toLong()
+                        if (bytes > allowanceBytes) {
+                            validationError = "Used amount cannot exceed the total allowance."
+                            return@Button
+                        }
+                        bytes
+                    } else 0L
+
+                    if (!isNoExpiry && exactExpiry != null && exactExpiry!! <= (promoToEdit?.startTimestamp ?: System.currentTimeMillis())) {
+                        validationError = "Expiry must be after tracking started."
+                        return@Button
+                    }
+                    if (isEditMode) {
+                        val startTimestamp = promoToEdit!!.startTimestamp
+                        val expirationTimestamp: Long? = if (!isNoExpiry) {
+                            val days = durationDaysStr.toIntOrNull()
+                            if (exactExpiry == null && (days == null || days <= 0)) {
+                                validationError = "Please enter valid duration days (e.g. 7)."
+                                return@Button
+                            }
+                            exactExpiry ?: (startTimestamp + ((days ?: 0) * 24L * 3_600_000L))
+                        } else {
+                            null
+                        }
+
+                        onSavePromo(
+                            promoToEdit.id,
+                            finalPromoName.trim(),
+                            allowanceBytes,
+                            startTimestamp,
+                            expirationTimestamp,
+                            usedBytes,
+                            selectedSimSlot,
+                            setAsActive,
+                            promoToEdit
+                        )
+                    } else {
+                        val now = System.currentTimeMillis()
+                        val startTimestamp = now
+                        val expirationTimestamp: Long? = if (!isNoExpiry) {
+                            val days = durationDaysStr.toIntOrNull()
+                            if (exactExpiry == null && (days == null || days <= 0)) {
+                                validationError = "Please enter valid duration days (e.g. 7)."
+                                return@Button
+                            }
+                            exactExpiry ?: (startTimestamp + ((days ?: 0) * 24L * 3_600_000L))
+                        } else {
+                            null
+                        }
+
+                        onSavePromo(
+                            0L,
+                            finalPromoName.trim(),
+                            allowanceBytes,
+                            startTimestamp,
+                            expirationTimestamp,
+                            usedBytes,
+                            selectedSimSlot,
+                            setAsActive,
+                            null
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(26.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MintPrimary,
+                    contentColor = MintOnPrimary
+                )
+            ) {
+                Text(
+                    text = if (isEditMode) "Save Changes" else "Save Promo",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MintOnPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * Pill Chip for Quick Presets matching preview (4).webp.
+ */
+@Composable
+private fun PresetPillChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) MintPrimaryContainer else Color(0xFF222B3B),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) MintPrimary else Color(0xFF2E394C)
+        )
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) MintPrimary else Color(0xFFD1D5DB),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        )
+    }
+}
+
+/**
+ * Styled rounded text input box matching reference inputs.
+ */
+@Composable
+private fun StyledInputFieldBox(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    suffix: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFF1E2636),
+        border = BorderStroke(1.dp, Color(0xFF2B364A))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 14.sp,
+                        color = Color(0xFF6B7A90)
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextHighEmphasis
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    cursorBrush = SolidColor(MintPrimary),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (suffix != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = suffix,
+                    fontSize = 13.sp,
+                    color = TextMediumEmphasis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Segmented Unit Toggle (GB / MB).
+ */
+@Composable
+private fun UnitSegmentPills(
+    selectedUnit: DataUnit,
+    onUnitSelected: (DataUnit) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF1E2636),
+        border = BorderStroke(1.dp, Color(0xFF2B364A))
+    ) {
+        Row(
+            modifier = Modifier.padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            DataUnit.entries.forEach { unit ->
+                val isSelected = (selectedUnit == unit)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected) MintPrimary else Color.Transparent)
+                        .clickable { onUnitSelected(unit) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = unit.label,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (isSelected) MintOnPrimary else TextMediumEmphasis
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * SIM Slot pill selector button.
+ */
+@Composable
+private fun SimSlotPillButton(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .height(46.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) MintPrimaryContainer else Color(0xFF1E2636),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) MintPrimary else Color(0xFF2B364A)
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            color = if (isSelected) MintPrimary else Color(0xFF4B5563),
+                            shape = CircleShape
+                        )
+                )
+                Text(
+                    text = title,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) MintPrimary else TextHighEmphasis
+                )
+            }
         }
     }
 }

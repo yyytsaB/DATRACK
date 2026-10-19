@@ -12,9 +12,9 @@ A native Android app that estimates whether a manually configured mobile-data al
 - Shared offset-plus-measured balance arithmetic, including inactive snapshots.
 - Threshold alerts at 50/80/90% and premature depletion. Permission/channel-blocked submissions are not marked delivered. Disabling a threshold intentionally consumes it when crossed.
 - About-hourly background checks, with explicit user/mutation-triggered refresh. Android can delay work; its usage statistics can lag actual traffic.
-- Mint visual identity, native light/dark themes, wrapping content, large-text navigation and expanded-width navigation rail.
+- Original mint/dark visual design restored at user request: ring gauge, typography, navigation, promo cards and compact/wide widget graphics. Functional fixes remain integrated into the original screens.
 - Scrollable history chart covering the selected range, accessible day/value labels and lazy daily rows. History is capped to a rolling 90-day window, not lifetime retention.
-- Compact/expanded launcher widgets with complete short summaries, a real refresh action and tap-to-open. Expanded layouts show reading freshness. The old decorative sparkline has been replaced by clearer wording.
+- Original compact/wide launcher widget layouts with ring/sparkline graphics, concise ETA wording, a real refresh action and tap-to-open.
 
 ## Measurement limits
 
@@ -44,7 +44,7 @@ On the audited workstation, Gradle's connected-test wrapper lacks offline UTP de
 - 138 JVM tests pass.
 - 12 instrumented tests pass on Samsung Galaxy A22 5G, Android 13, including actual placed-widget state persistence and refresh scheduling.
 - Preview and test APKs assemble; Android lint has no errors. Remaining warnings include dependency/icon maintenance and context-holder warnings whose factories pass application context.
-- Actual Samsung launcher placement, compact/expanded resizing, body tap and refresh checked. The final expanded widget and dashboard were visually inspected at 200% text size; font scale restored afterward.
+- Actual Samsung launcher placement, resizing, body tap and refresh were checked during implementation. The earlier redesigned layout passed a 200% text check; that certification does not apply to the subsequently restored original layout. Revalidate text-size coverage before release.
 - A new preview promo was created through the UI and survived a data-preserving preview update. Original app data and widget were not upgraded or deleted.
 
 This is a verified preview, not a complete release certification. See [implementation status](docs/implementation-status.md) for outstanding cross-device, accessibility and multi-day measurement checks. No database schema change was needed for these fixes; existing v4 rows preserve their measurement boundary and offset.
