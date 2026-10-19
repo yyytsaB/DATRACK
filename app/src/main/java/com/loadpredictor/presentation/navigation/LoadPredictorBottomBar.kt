@@ -32,7 +32,7 @@ fun LoadPredictorBottomBar(
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         NavigationBar(
-            containerColor = DarkBackground,
+            containerColor = com.loadpredictor.presentation.theme.SurfaceRecessed,
             contentColor = TextHighEmphasis,
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth()
@@ -52,7 +52,7 @@ fun LoadPredictorBottomBar(
                     label = {
                         Text(
                             text = destination.label,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     },
@@ -61,7 +61,7 @@ fun LoadPredictorBottomBar(
                         selectedTextColor = MintPrimary,
                         unselectedIconColor = TextLowEmphasis,
                         unselectedTextColor = TextLowEmphasis,
-                        indicatorColor = MintPrimaryContainer.copy(alpha = 0.4f)
+                        indicatorColor = MintPrimaryContainer
                     )
                 )
             }

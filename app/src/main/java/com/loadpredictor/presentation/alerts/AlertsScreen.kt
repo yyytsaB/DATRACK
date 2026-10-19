@@ -91,20 +91,7 @@ fun AlertsScreen(
     Scaffold(
         containerColor = DarkBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Alerts",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextHighEmphasis
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = TextHighEmphasis
-                )
-            )
+            com.loadpredictor.presentation.common.ScreenHeader("Alerts", "A heads-up before your data runs low.")
         }
     ) { innerPadding ->
         Column(
@@ -112,7 +99,7 @@ fun AlertsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Permission Recovery Banner (shown if POST_NOTIFICATIONS is not granted)
@@ -125,7 +112,7 @@ fun AlertsScreen(
             // Configurable Thresholds Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
                 border = BorderStroke(1.dp, BorderHighlight)
             ) {
@@ -135,11 +122,11 @@ fun AlertsScreen(
                         .padding(20.dp)
                 ) {
                     Text(
-                        text = "ALERTS",
+                        text = "Data usage reminders",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextMediumEmphasis,
-                        letterSpacing = 1.2.sp,
+                        letterSpacing = 0.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 

@@ -72,7 +72,7 @@ fun InteractiveUsageChart(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
         border = BorderStroke(1.dp, BorderHighlight)
     ) {
@@ -168,7 +168,7 @@ fun InteractiveUsageChart(
                             val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
                             val animatedHeightFraction by animateFloatAsState(
                                 targetValue = targetFraction,
-                                animationSpec = tween(durationMillis = 500),
+                                animationSpec = tween(durationMillis = 200),
                                 label = "barHeight"
                             )
 
@@ -206,11 +206,11 @@ fun InteractiveUsageChart(
                                 Text(
                                     text = if (showLabel) formatShortDay(bucket.startTimestamp) else "",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     color = if (isSelected) MintPrimary else TextLowEmphasis,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center,
-                                    maxLines = 1
+                                    maxLines = 2
                                 )
                             }
                         }

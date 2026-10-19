@@ -63,20 +63,7 @@ fun HistoryScreen(
     Scaffold(
         containerColor = DarkBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Usage History",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextHighEmphasis
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = TextHighEmphasis
-                )
-            )
+            com.loadpredictor.presentation.common.ScreenHeader("Usage history", "Understand your mobile data habits.")
         }
     ) { innerPadding ->
         if (uiState.isLoading && uiState.dailyBuckets.isEmpty()) {

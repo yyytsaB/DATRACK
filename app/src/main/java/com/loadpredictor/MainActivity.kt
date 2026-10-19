@@ -6,6 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.LinearProgressIndicator
+import com.loadpredictor.presentation.common.ForecastCopy
+import com.loadpredictor.presentation.common.ScreenHeader
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,27 +36,19 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,10 +69,8 @@ import com.loadpredictor.presentation.MainUiState
 import com.loadpredictor.presentation.MainViewModel
 import com.loadpredictor.presentation.alerts.AlertsScreen
 import com.loadpredictor.presentation.common.UsagePermissionRequiredCard
-import com.loadpredictor.presentation.dashboard.BurnAlertsOptInCard
 import com.loadpredictor.presentation.dashboard.DailyUsageTeaserCard
 import com.loadpredictor.presentation.dashboard.DashboardStatChips
-import com.loadpredictor.presentation.dashboard.RadialPaceRing
 import com.loadpredictor.presentation.history.HistoryScreen
 import com.loadpredictor.presentation.history.HistoryViewModel
 import com.loadpredictor.presentation.navigation.LoadPredictorBottomBar
@@ -92,19 +84,10 @@ import com.loadpredictor.presentation.theme.LoadPredictorTheme
 import com.loadpredictor.presentation.theme.MintOnPrimary
 import com.loadpredictor.presentation.theme.MintPrimary
 import com.loadpredictor.presentation.theme.MintPrimaryContainer
-import com.loadpredictor.presentation.theme.PaceCalibrating
-import com.loadpredictor.presentation.theme.PaceCalibratingContainer
-import com.loadpredictor.presentation.theme.PaceCalibratingText
-import com.loadpredictor.presentation.theme.PaceConservative
-import com.loadpredictor.presentation.theme.PaceConservativeContainer
-import com.loadpredictor.presentation.theme.PaceConservativeText
 import com.loadpredictor.presentation.theme.PaceCritical
 import com.loadpredictor.presentation.theme.PaceCriticalContainer
 import com.loadpredictor.presentation.theme.PaceCriticalText
-import com.loadpredictor.presentation.theme.PaceOnTrackContainer
-import com.loadpredictor.presentation.theme.PaceOnTrackText
 import com.loadpredictor.presentation.theme.SurfaceLayer1
-import com.loadpredictor.presentation.theme.SurfaceRecessed
 import com.loadpredictor.presentation.theme.TextHighEmphasis
 import com.loadpredictor.presentation.theme.TextMediumEmphasis
 import com.loadpredictor.presentation.widget.WidgetsScreen
@@ -285,22 +268,7 @@ fun DashboardView(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        TopAppBar(
-            title = {
-                Text(
-                    text = "DATRACK",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
-                    fontStyle = FontStyle.Italic,
-                    letterSpacing = 1.sp,
-                    color = TextHighEmphasis
-                )
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = DarkBackground,
-                titleContentColor = TextHighEmphasis
-            )
-        )
+        ScreenHeader("DATRACK", "Your data, a little clearer. · Preview")
 
         Column(
             modifier = Modifier
@@ -348,138 +316,43 @@ fun DashboardView(
 }
 
 @Composable
-fun LiveForecastHeroSection(
-    forecast: BurnForecast,
-    dailyAvgBytes: Long
-) {
-    if (forecast.pace == BurnPace.EXPIRED) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(forecast.promo.name, style = MaterialTheme.typography.titleMedium, color = TextMediumEmphasis)
-            Text("Promo expired", style = MaterialTheme.typography.headlineMedium, color = PaceCritical)
-            Text("${DataFormatter.formatBytes(forecast.dataRemainingBytes)} unused when validity ended. This data is no longer available.", color = TextHighEmphasis)
-        }
-        return
-    }
-    val remainingRatio = (forecast.dataRemainingBytes.toFloat() / forecast.promo.totalAllowanceBytes.toFloat()).coerceIn(0f, 1f)
-    val dataPair = DataFormatter.formatDataPair(
-        remainingBytes = forecast.dataRemainingBytes,
-        totalAllowanceBytes = forecast.promo.totalAllowanceBytes
-    )
-    val simSlotTitle = if (forecast.promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"
-    val depletionHighlight = formatDepletionHeadline(forecast)
-    val promoExpiryHeadline = formatPromoExpiryHeadline(forecast)
-
-    val paceHighlightColor = when (forecast.pace) {
-        BurnPace.BURNING_FAST -> Color(0xFFFF9F43)
-        BurnPace.ON_TRACK -> MintPrimary
-        BurnPace.CONSERVATIVE -> PaceConservative
-        BurnPace.INSUFFICIENT_DATA -> PaceCalibrating
-        BurnPace.EXPIRED, BurnPace.DEPLETED -> Color(0xFFFF5252)
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // 1. Context Row: Promo name & sync status on Left, SIM chip on Right
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column {
-                Text(
-                    text = "${forecast.promo.name} • $simSlotTitle",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF8E9AA8),
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = com.loadpredictor.presentation.common.ForecastCopy.updated(forecast.observedAt, System.currentTimeMillis()),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF5A6678),
-                    fontSize = 12.sp
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF142426),
-                border = BorderStroke(1.dp, Color(0xFF1B3D3B))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(Color(0xFF05D686), CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = simSlotTitle,
-                        color = Color(0xFF05D686),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
+fun LiveForecastHeroSection(forecast: BurnForecast, dailyAvgBytes: Long) {
+    val now = System.currentTimeMillis()
+    val expired = forecast.pace == BurnPace.EXPIRED
+    val ratio = (forecast.dataRemainingBytes.toFloat() / forecast.promo.totalAllowanceBytes.coerceAtLeast(1)).coerceIn(0f, 1f)
+    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Surface(color = SurfaceLayer1, shape = RoundedCornerShape(16.dp)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(forecast.promo.name, style = MaterialTheme.typography.titleLarge, color = TextHighEmphasis)
+                Text("${if (forecast.promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"} · ${if (forecast.promo.isNoExpiry) "No expiry" else "Time-limited promo"}",
+                    style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)
+                Text(if (expired) "Validity ended" else "${DataFormatter.formatBytes(forecast.dataRemainingBytes)} left",
+                    style = MaterialTheme.typography.displaySmall, color = if (expired) PaceCriticalText else MintPrimary)
+                LinearProgressIndicator(progress = { if (expired) 0f else ratio }, modifier = Modifier.fillMaxWidth().height(8.dp),
+                    color = MintPrimary, trackColor = com.loadpredictor.presentation.theme.SurfaceLayer2)
+                Text(if (expired) "${DataFormatter.formatBytes(forecast.dataRemainingBytes)} unused at expiry" else
+                    "${DataFormatter.formatBytes(forecast.promo.totalAllowanceBytes - forecast.dataRemainingBytes)} used of ${DataFormatter.formatBytes(forecast.promo.totalAllowanceBytes)}",
+                    style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)
+                HorizontalDivider(color = DarkOutlineVariant)
+                Text(ForecastCopy.updated(forecast.observedAt, now), style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
             }
         }
-
-        // 2. Headline Prediction Section
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "At current pace, you'll run out",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                fontSize = 22.sp
-            )
-            Text(
-                text = depletionHighlight,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = paceHighlightColor,
-                fontSize = 22.sp
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = promoExpiryHeadline,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF8E9AA8),
-                fontSize = 13.sp
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Your forecast", style = MaterialTheme.typography.titleLarge, color = TextHighEmphasis)
+            PaceBadge(forecast.pace, forecast.promo.isNoExpiry)
+            Text(when {
+                expired -> "This promo has ended. Unused data is no longer available."
+                forecast.pace == BurnPace.DEPLETED -> "Your tracked allowance has been used up."
+                forecast.pace == BurnPace.INSUFFICIENT_DATA -> "Your estimate will appear after enough time and mobile data usage."
+                else -> forecast.plainLanguageSummary
+            }, style = MaterialTheme.typography.bodyLarge, color = TextHighEmphasis)
+            if (!expired && forecast.pace != BurnPace.DEPLETED) {
+                Text(formatPromoExpiryHeadline(forecast), style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)
+            }
         }
-
-        // 3. Pace Status Badge Pill
-        PaceBadge(pace = forecast.pace, isNoExpiry = forecast.promo.isNoExpiry)
-
-        // 4. Hero Radial Ring Gauge
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            RadialPaceRing(
-                remainingRatio = remainingRatio,
-                remainingFormatted = dataPair.remainingFormatted,
-                totalAllowanceFormatted = dataPair.totalFormatted,
-                pace = forecast.pace,
-                size = 230.dp,
-                strokeWidth = 15.dp
-            )
-        }
-
-        // 5. 3 Stat Chips (Daily avg, Days left, At this pace)
-        DashboardStatChips(
-            forecast = forecast,
-            dailyAvgBytes = dailyAvgBytes
-        )
+        DashboardStatChips(forecast, dailyAvgBytes)
+        Text("Usage is measured across this device. The SIM label identifies your selected promo; it does not separate SIM traffic.",
+            style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
     }
 }
 
@@ -490,19 +363,19 @@ fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
             Color(0xFF2E2016),
             Color(0xFFFF9F43),
             Color(0xFFFF9F43),
-            if (isNoExpiry) "Burning Fast" else "Cutting It Close"
+            "May run out early"
         )
         BurnPace.ON_TRACK -> Quadruple(
             Color(0xFF0C2B1D),
             Color(0xFF00F5D4),
             Color(0xFF00F5D4),
-            if (isNoExpiry) "Steady Pace" else "Safe Pace"
+            if (isNoExpiry) "Steady usage" else "On track"
         )
         BurnPace.CONSERVATIVE -> Quadruple(
             Color(0xFF0F2438),
             Color(0xFF38BDF8),
             Color(0xFF38BDF8),
-            if (isNoExpiry) "Light Pace" else "Conservative Pace"
+            if (isNoExpiry) "Light usage" else "Data should last"
         )
         BurnPace.EXPIRED -> Quadruple(PaceCriticalContainer, PaceCritical, PaceCriticalText, "Promo expired")
         BurnPace.DEPLETED -> Quadruple(
@@ -515,7 +388,7 @@ fun PaceBadge(pace: BurnPace, isNoExpiry: Boolean = false) {
             Color(0xFF2E2414),
             Color(0xFFFBBF24),
             Color(0xFFFBBF24),
-            "Calibrating"
+            "Learning your usage"
         )
     }
 

@@ -3,6 +3,9 @@ package com.loadpredictor.presentation.promo
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -205,7 +208,7 @@ fun PromoEntryDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = "Quick presets",
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = TextMediumEmphasis
                 )
@@ -243,7 +246,7 @@ fun PromoEntryDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Promo Name",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextMediumEmphasis
                     )
@@ -263,7 +266,7 @@ fun PromoEntryDialog(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "Allowance",
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = TextMediumEmphasis
                 )
@@ -300,7 +303,7 @@ fun PromoEntryDialog(
                 ) {
                     Text(
                         text = "Validity",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextMediumEmphasis
                     )
@@ -327,7 +330,7 @@ fun PromoEntryDialog(
                                 uncheckedThumbColor = TextMediumEmphasis,
                                 uncheckedTrackColor = SurfaceRecessed
                             ),
-                            modifier = Modifier.height(24.dp)
+                            modifier = Modifier.heightIn(min = 48.dp)
                         )
                     }
                 }
@@ -348,15 +351,15 @@ fun PromoEntryDialog(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
+                            .heightIn(min = 56.dp),
                         shape = RoundedCornerShape(14.dp),
-                        color = Color(0xFF1E2636),
-                        border = BorderStroke(1.dp, Color(0xFF2B364A))
+                        color = Color(0xFF213034),
+                        border = BorderStroke(1.dp, Color(0xFF34464A))
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Text(
@@ -371,7 +374,7 @@ fun PromoEntryDialog(
             }
 
             if (!isNoExpiry) {
-                exactExpiry?.let { Text("Actual expiry: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it))}", color = TextMediumEmphasis, fontSize = 12.sp) }
+                exactExpiry?.let { Text("Actual expiry: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it))}", color = TextMediumEmphasis, fontSize = 14.sp) }
                 androidx.compose.material3.TextButton(onClick = {
                     val cal = java.util.Calendar.getInstance().apply { timeInMillis = exactExpiry ?: (System.currentTimeMillis() + 7 * 86400000L) }
                     android.app.DatePickerDialog(context, { _, y, m, d ->
@@ -389,7 +392,7 @@ fun PromoEntryDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Already used (optional)",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextMediumEmphasis
                     )
@@ -422,7 +425,7 @@ fun PromoEntryDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "SIM Slot",
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = TextMediumEmphasis
                 )
@@ -451,7 +454,7 @@ fun PromoEntryDialog(
                 Text(
                     text = validationError ?: saveError.orEmpty(),
                     color = PaceCritical,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -539,7 +542,7 @@ fun PromoEntryDialog(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .heightIn(min = 52.dp),
                 shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
@@ -563,89 +566,18 @@ fun PromoEntryDialog(
  * Pill Chip for Quick Presets matching preview (4).webp.
  */
 @Composable
-private fun PresetPillChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) MintPrimaryContainer else Color(0xFF222B3B),
-        border = BorderStroke(
-            1.dp,
-            if (isSelected) MintPrimary else Color(0xFF2E394C)
-        )
-    ) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) MintPrimary else Color(0xFFD1D5DB),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-        )
-    }
+private fun PresetPillChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    FilterChip(selected = isSelected, onClick = onClick, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
 }
 
-/**
- * Styled rounded text input box matching reference inputs.
- */
 @Composable
-private fun StyledInputFieldBox(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    suffix: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xFF1E2636),
-        border = BorderStroke(1.dp, Color(0xFF2B364A))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        fontSize = 14.sp,
-                        color = Color(0xFF6B7A90)
-                    )
-                }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextHighEmphasis
-                    ),
-                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                    cursorBrush = SolidColor(MintPrimary),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            if (suffix != null) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = suffix,
-                    fontSize = 13.sp,
-                    color = TextMediumEmphasis
-                )
-            }
-        }
-    }
+private fun StyledInputFieldBox(value: String, onValueChange: (String) -> Unit, placeholder: String,
+    suffix: String? = null, keyboardType: KeyboardType = KeyboardType.Text, modifier: Modifier = Modifier) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, singleLine = true,
+        placeholder = { Text(placeholder) },
+        suffix = suffix?.let { { Text(it) } },
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(12.dp))
 }
 
 /**
@@ -658,8 +590,8 @@ private fun UnitSegmentPills(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFF1E2636),
-        border = BorderStroke(1.dp, Color(0xFF2B364A))
+        color = Color(0xFF213034),
+        border = BorderStroke(1.dp, Color(0xFF34464A))
     ) {
         Row(
             modifier = Modifier.padding(3.dp),
@@ -672,13 +604,13 @@ private fun UnitSegmentPills(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isSelected) MintPrimary else Color.Transparent)
                         .clickable { onUnitSelected(unit) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = unit.label,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         color = if (isSelected) MintOnPrimary else TextMediumEmphasis
                     )
                 }
@@ -699,13 +631,13 @@ private fun SimSlotPillButton(
 ) {
     Surface(
         modifier = modifier
-            .height(46.dp)
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) MintPrimaryContainer else Color(0xFF1E2636),
+        color = if (isSelected) MintPrimaryContainer else Color(0xFF213034),
         border = BorderStroke(
             1.dp,
-            if (isSelected) MintPrimary else Color(0xFF2B364A)
+            if (isSelected) MintPrimary else Color(0xFF34464A)
         )
     ) {
         Box(

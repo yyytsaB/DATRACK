@@ -6,28 +6,28 @@ import androidx.compose.ui.graphics.Color
 // ---------------------------------------------------------------------------
 // Core Surface & Elevation Hierarchy (Near-Black -> Layer 1 -> Layer 2 -> Recessed)
 // ---------------------------------------------------------------------------
-val DarkBackground = Color(0xFF0A0D10)       // Deepest near-black canvas
+val DarkBackground = Color(0xFF0D1416)       // Deepest near-black canvas
 val SurfaceBase = DarkBackground
 
-val SurfaceLayer1 = Color(0xFF131722)        // Main cards & dialog surface
+val SurfaceLayer1 = Color(0xFF172225)        // Main cards & dialog surface
 val DarkSurfaceVariant = SurfaceLayer1
 
-val SurfaceLayer2 = Color(0xFF1F2633)        // Elevated tiles, input containers, preset chips
+val SurfaceLayer2 = Color(0xFF213034)        // Elevated tiles, input containers, preset chips
 val DarkSurfaceHighlight = SurfaceLayer2
 
-val SurfaceRecessed = Color(0xFF0C0F16)      // Recessed advisory boxes & chart stage
+val SurfaceRecessed = Color(0xFF101B1E)      // Recessed advisory boxes & chart stage
 val DarkSurface = SurfaceRecessed
 
-val DarkOutline = Color(0xFF262C38)          // Structural card & element border
-val BorderHighlight = Color(0xFF2A3446)      // Subtle top highlight border
-val DarkOutlineVariant = Color(0xFF1A1F29)   // Ultra subtle separators
+val DarkOutline = Color(0xFF34464A)          // Structural card & element border
+val BorderHighlight = Color(0xFF34464A)      // Subtle top highlight border
+val DarkOutlineVariant = Color(0xFF26373B)   // Ultra subtle separators
 
 // ---------------------------------------------------------------------------
 // Typography High & Low Emphasis
 // ---------------------------------------------------------------------------
 val TextHighEmphasis = Color(0xFFFFFFFF)     // Pure crisp white for headers & hero numbers
-val TextMediumEmphasis = Color(0xFF8E99A8)   // Slate gray for labels & body (contrast > 5.9:1)
-val TextLowEmphasis = Color(0xFF64748B)      // Muted slate for captions & timestamps
+val TextMediumEmphasis = Color(0xFFB0C2C5)   // Slate gray for labels & body (contrast > 5.9:1)
+val TextLowEmphasis = Color(0xFF96ADB1)      // Muted slate for captions & timestamps
 
 // ---------------------------------------------------------------------------
 // Light-Card Surface & Typography Tokens (For Widget Light Preview Cards)
@@ -45,10 +45,10 @@ val DarkLinearTrack = Color(0xFF252D3D)      // Dark linear progress bar track
 // ---------------------------------------------------------------------------
 // Primary Brand & Interactive Accent (Teal / Electric Mint)
 // ---------------------------------------------------------------------------
-val MintPrimary = Color(0xFF00F5D4)          // Electric Mint accent for buttons, FAB, focus rings, sliders
+val MintPrimary = Color(0xFF70E0BE)          // Electric Mint accent for buttons, FAB, focus rings, sliders
 val MintOnPrimary = Color(0xFF0A1513)        // Deep dark text on mint (contrast > 14:1)
-val MintPrimaryContainer = Color(0xFF003B33) // Deep mint container for active chips/badges
-val MintOnPrimaryContainer = Color(0xFF70FCE7)// Bright mint text on deep container (contrast > 9:1)
+val MintPrimaryContainer = Color(0xFF193F36) // Deep mint container for active chips/badges
+val MintOnPrimaryContainer = Color(0xFFABF2D9)// Bright mint text on deep container (contrast > 9:1)
 val MintGlow = Color(0x6600F5D4)             // Subtle ambient mint glow
 
 // ---------------------------------------------------------------------------

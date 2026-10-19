@@ -166,14 +166,14 @@ fun RadialPaceRing(
                 text = "of $totalAllowanceFormatted",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF8E9AA8)
+                color = Color(0xFFB0C2C5)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "remaining",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
-                color = Color(0xFF5A6678)
+                color = Color(0xFF96ADB1)
             )
         }
     }

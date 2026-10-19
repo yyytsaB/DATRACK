@@ -5,6 +5,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.TextButton
+import com.loadpredictor.presentation.theme.*
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,38 +54,25 @@ fun DailyUsageTeaserCard(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Daily Usage",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = dateRangeText,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF6B7280),
-                fontSize = 12.sp
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Daily usage", style = MaterialTheme.typography.titleLarge, color = TextHighEmphasis)
+            Text(dateRangeText, style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
         }
 
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onViewHistoryClick),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF141824)),
-            border = BorderStroke(1.dp, Color(0xFF222B3D))
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
+            border = BorderStroke(1.dp, DarkOutline)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
             ) {
+                if (buckets.isEmpty()) Text("Daily readings will appear as Android records your mobile data usage.", color = TextMediumEmphasis)
                 // Mini Bar Strip
                 val maxBytes = (buckets.maxOfOrNull { it.totalBytes } ?: 1L).coerceAtLeast(1024L * 1024L).toFloat()
                 val visibleBuckets = buckets.takeLast(14)
@@ -111,7 +100,7 @@ fun DailyUsageTeaserCard(
                         val barColor = if (isToday) {
                             MintPrimary
                         } else {
-                            Color(0xFF233544)
+                            TextMediumEmphasis.copy(alpha = 0.45f)
                         }
 
                         drawRoundRect(
@@ -122,6 +111,7 @@ fun DailyUsageTeaserCard(
                         )
                     }
                 }
+                TextButton(onClick = onViewHistoryClick) { Text("Explore usage history") }
             }
         }
     }
