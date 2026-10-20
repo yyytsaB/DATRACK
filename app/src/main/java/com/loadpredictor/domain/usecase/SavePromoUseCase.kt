@@ -19,18 +19,6 @@ class SavePromoUseCase(
             "Promo start timestamp cannot be in the future"
         }
 
-        return if (promo.id == 0L) {
-            val generatedId = promoRepository.insertPromo(promo)
-            if (promo.isActive) {
-                promoRepository.setActivePromo(generatedId)
-            }
-            generatedId
-        } else {
-            promoRepository.updatePromo(promo)
-            if (promo.isActive) {
-                promoRepository.setActivePromo(promo.id)
-            }
-            promo.id
-        }
+        return promoRepository.saveConfiguredPromo(promo)
     }
 }

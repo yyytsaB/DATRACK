@@ -15,6 +15,8 @@ class ForecastIntegrationRegressionTest {
     private val gb = 1073741824L
     @Test fun `expired promo never counts traffic after validity ends`() = runTest {
         val repo = mockk<PromoRepository>(relaxed = true)
+        coEvery { repo.isCurrentConfiguration(any()) } returns true
+        coEvery { repo.updateObservedSyncState(any(),any(),any(),any()) } returns true
         val usage = mockk<UsageRepository>()
         val promo = Promo(name = "Expired", totalAllowanceBytes = gb, startTimestamp = 0, expirationTimestamp = day)
         coEvery { usage.queryMobileUsageBytes(0, day) } returns 100L
@@ -27,6 +29,8 @@ class ForecastIntegrationRegressionTest {
         val today = LocalDate.of(2026, 10, 20)
         val now = today.atStartOfDay(zone).toInstant().toEpochMilli() + 12 * 3600000L
         val repo = mockk<PromoRepository>(relaxed = true)
+        coEvery { repo.isCurrentConfiguration(any()) } returns true
+        coEvery { repo.updateObservedSyncState(any(),any(),any(),any()) } returns true
         val usage = mockk<UsageRepository>()
         val buckets = (3L downTo 1L).map { n -> UsageBucket(
             today.minusDays(n).atStartOfDay(zone).toInstant().toEpochMilli(),

@@ -46,7 +46,14 @@ object WidgetSyncHelper {
                 getDailyUsageBreakdownUseCase = GetDailyUsageBreakdownUseCase(usageRepository)
             )
 
-            when (val result = useCase.execute(activePromo, now)) {
+            fromForecastResult(useCase.execute(activePromo,now),now)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            WidgetState.Error(e.localizedMessage ?: "Sync failed")
+        }
+    }
+
+    fun fromForecastResult(result: BurnForecastResult, now:Long):WidgetState = when(result) {
                 is BurnForecastResult.PermissionRequired -> WidgetState.PermissionRequired
                 is BurnForecastResult.NoActivePromo -> WidgetState.NoActivePromo
                 is BurnForecastResult.Error -> WidgetState.Error(result.message)
@@ -70,11 +77,6 @@ object WidgetSyncHelper {
                         expirationTimestamp = forecast.promo.expirationTimestamp
                     )
                 }
-            }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            WidgetState.Error(e.localizedMessage ?: "Sync failed")
-        }
     }
 
     /**

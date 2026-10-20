@@ -28,6 +28,12 @@ interface PromoRepository {
      */
     fun getActivePromoForSim(simSlot: SimSlot): Flow<Promo?>
 
+    /** Save editable fields and active selection atomically, preserving current runtime checkpoints. */
+    suspend fun saveConfiguredPromo(promo: Promo): Long
+    /** Reject readings computed for an old configuration/checkpoint. */
+    suspend fun updateObservedSyncState(observed: Promo, burnRate: Double?, bytes: Long, at: Long): Boolean
+    suspend fun isCurrentConfiguration(promo: Promo): Boolean
+
     /**
      * Inserts a new promo and returns its generated ID.
      */

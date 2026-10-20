@@ -34,6 +34,15 @@ class UseCasesTest {
         override fun getActivePromoForSim(simSlot: SimSlot): Flow<Promo?> =
             MutableStateFlow(promos.find { it.simSlot == simSlot && it.isActive })
 
+        override suspend fun saveConfiguredPromo(promo: Promo): Long {
+            val id=if(promo.id==0L) insertPromo(promo) else {updatePromo(promo);promo.id}
+            if(promo.isActive) setActivePromo(id)
+            return id
+        }
+        override suspend fun updateObservedSyncState(observed:Promo,burnRate:Double?,bytes:Long,at:Long):Boolean {
+            updateSyncState(observed.id,burnRate,bytes,at);return true
+        }
+        override suspend fun isCurrentConfiguration(promo:Promo):Boolean = true
         override suspend fun insertPromo(promo: Promo): Long {
             val id = (promos.size + 1).toLong()
             val created = promo.copy(id = id)

@@ -31,6 +31,21 @@ class PromoRepositoryImpl(
         return promoDao.getActivePromoForSim(simSlot).map { it?.toDomain() }
     }
 
+    override suspend fun saveConfiguredPromo(promo: Promo): Long =
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive { promoDao.saveConfiguredPromo(promo.toEntity()) }
+
+    override suspend fun updateObservedSyncState(observed:Promo,burnRate:Double?,bytes:Long,at:Long):Boolean =
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+            promoDao.updateObservedCheckpoint(observed.id,observed.startTimestamp,observed.initialUsageOffsetBytes,
+                observed.totalAllowanceBytes,observed.lastSyncTimestamp,observed.lastSyncDataUsedBytes,burnRate,bytes,at)==1
+        }
+
+    override suspend fun isCurrentConfiguration(promo:Promo):Boolean {
+        val current=promoDao.findById(promo.id)?.toDomain() ?: return false
+        return current.isActive && current.copy(lastActiveBurnRate=promo.lastActiveBurnRate,
+            lastSyncDataUsedBytes=promo.lastSyncDataUsedBytes,lastSyncTimestamp=promo.lastSyncTimestamp)==promo
+    }
+
     override suspend fun insertPromo(promo: Promo): Long {
         return promoDao.insertPromo(promo.toEntity())
     }
@@ -40,11 +55,11 @@ class PromoRepositoryImpl(
     }
 
     override suspend fun deletePromo(promo: Promo) {
-        promoDao.deletePromo(promo.toEntity())
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive { promoDao.deletePromo(promo.toEntity()) }
     }
 
     override suspend fun setActivePromo(id: Long) {
-        promoDao.setActivePromo(id)
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive { promoDao.setActivePromo(id) }
     }
 
     override suspend fun updateSyncState(

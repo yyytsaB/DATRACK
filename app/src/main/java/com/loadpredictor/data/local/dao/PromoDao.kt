@@ -46,10 +46,37 @@ abstract class PromoDao {
      */
     @Transaction
     open suspend fun setActivePromo(id: Long) {
+        require(findById(id) != null) { "Promo no longer exists" }
         deactivateAllPromos()
-        activatePromoById(id)
+        check(activatePromoById(id) == 1)
     }
 
-    @Query("UPDATE promos SET last_active_burn_rate = :burnRate, last_sync_data_used_bytes = :dataUsedBytes, last_sync_timestamp = :syncTimestamp WHERE id = :promoId")
+    @Query("UPDATE promos SET last_active_burn_rate = :burnRate, last_sync_data_used_bytes = :dataUsedBytes, last_sync_timestamp = :syncTimestamp WHERE id = :promoId AND last_sync_timestamp <= :syncTimestamp")
     abstract suspend fun updateSyncState(promoId: Long, burnRate: Double?, dataUsedBytes: Long, syncTimestamp: Long): Int
+
+    @Query("SELECT * FROM promos WHERE id = :id LIMIT 1")
+    abstract suspend fun findById(id: Long): PromoEntity?
+
+    @Transaction
+    open suspend fun saveConfiguredPromo(input: PromoEntity): Long {
+        input.toDomain() // Validate before changing any selection.
+        val old = if (input.id == 0L) null else requireNotNull(findById(input.id)) { "Promo no longer exists" }
+        val changed = old != null && (old.startTimestamp != input.startTimestamp || old.initialUsageOffsetBytes != input.initialUsageOffsetBytes)
+        val current = input.copy(
+            isActive = false,
+            lastActiveBurnRate = if (changed || old == null) null else old.lastActiveBurnRate,
+            lastSyncDataUsedBytes = if (changed || old == null) 0 else old.lastSyncDataUsedBytes,
+            lastSyncTimestamp = if (changed || old == null) 0 else old.lastSyncTimestamp)
+        val id = if (old == null) insertPromo(current) else { check(updatePromo(current) == 1); input.id }
+        if (input.isActive) setActivePromo(id)
+        return id
+    }
+
+    @Query("""UPDATE promos SET last_active_burn_rate=:rate, last_sync_data_used_bytes=:bytes,
+        last_sync_timestamp=:at WHERE id=:id AND is_active=1 AND start_timestamp=:start
+        AND initial_usage_offset_bytes=:offset AND total_allowance_bytes=:allowance
+        AND last_sync_timestamp=:previousAt AND last_sync_data_used_bytes=:previousBytes
+        AND :at >= last_sync_timestamp""")
+    abstract suspend fun updateObservedCheckpoint(id:Long,start:Long,offset:Long,allowance:Long,
+        previousAt:Long,previousBytes:Long,rate:Double?,bytes:Long,at:Long):Int
 }

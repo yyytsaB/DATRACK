@@ -34,16 +34,24 @@ class GetActiveBurnForecastUseCase(
     private val timeProvider: TimeProvider = DefaultTimeProvider(),
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) {
-    suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult {
+    suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult =
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive { evaluate(activePromo,currentTime) }
+
+    private suspend fun evaluate(activePromo:Promo?,currentTime:Long?):BurnForecastResult {
         if (activePromo == null) {
             return BurnForecastResult.NoActivePromo
         }
         return try {
             val now = currentTime ?: timeProvider.currentTimeMillis()
+            if (now < activePromo.lastSyncTimestamp) return BurnForecastResult.Error("A newer reading is already available. Refresh again.")
             val usedBytes = usageRepository.queryMobileUsageBytes(
                 startTime = activePromo.startTimestamp,
                 endTime = minOf(now, activePromo.expirationTimestamp ?: now)
             )
+            if (usedBytes < activePromo.lastSyncDataUsedBytes && now >= activePromo.lastSyncTimestamp) {
+                promoRepository.updateObservedSyncState(activePromo,null,usedBytes,now)
+                return BurnForecastResult.Error("Android revised its usage history. Refresh to recalibrate the estimate.")
+            }
             val forecast = burnRateEngine.calculateForecast(
                 promo = activePromo,
                 dataUsedBytesRaw = usedBytes,
@@ -115,12 +123,12 @@ class GetActiveBurnForecastUseCase(
             }
 
             if (shouldPersistSyncState && forecast.burnRateBytesPerHour > 0.0) {
-                promoRepository.updateSyncState(
-                    promoId = activePromo.id,
-                    burnRate = forecast.burnRateBytesPerHour,
-                    dataUsedBytes = usedBytes,
-                    syncTimestamp = now
-                )
+                if (!promoRepository.updateObservedSyncState(activePromo,forecast.burnRateBytesPerHour,usedBytes,now)) {
+                    return BurnForecastResult.Error("The reading changed during refresh. Try again.")
+                }
+            }
+            if (!promoRepository.isCurrentConfiguration(activePromo)) {
+                return BurnForecastResult.Error("The selected promo changed. Refresh for its current reading.")
             }
             val consistentForecast = if (anchoredForecast.pace != BurnPace.EXPIRED &&
                 anchoredForecast.pace != BurnPace.DEPLETED && anchoredForecast.pace != BurnPace.INSUFFICIENT_DATA &&

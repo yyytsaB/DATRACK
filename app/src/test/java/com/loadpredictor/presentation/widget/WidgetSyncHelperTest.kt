@@ -25,6 +25,15 @@ class WidgetSyncHelperTest {
         override fun getAllPromos(): Flow<List<Promo>> = MutableStateFlow(emptyList())
         override fun getPromoById(id: Long): Flow<Promo?> = MutableStateFlow(null)
         override fun getActivePromoForSim(simSlot: SimSlot): Flow<Promo?> = MutableStateFlow(null)
+        override suspend fun saveConfiguredPromo(promo: Promo): Long {
+            val id=if(promo.id==0L) insertPromo(promo) else {updatePromo(promo);promo.id}
+            if(promo.isActive) setActivePromo(id)
+            return id
+        }
+        override suspend fun updateObservedSyncState(observed:Promo,burnRate:Double?,bytes:Long,at:Long):Boolean {
+            updateSyncState(observed.id,burnRate,bytes,at);return true
+        }
+        override suspend fun isCurrentConfiguration(promo:Promo):Boolean = true
         override suspend fun insertPromo(promo: Promo): Long = 1L
         override suspend fun updatePromo(promo: Promo) {}
         override suspend fun deletePromo(promo: Promo) {}

@@ -33,7 +33,11 @@ class UsageSyncWorker(
 
     companion object { private val syncMutex = Mutex() }
 
-    override suspend fun doWork(): Result = syncMutex.withLock {
+    override suspend fun doWork(): Result = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+        runWork()
+    }
+
+    private suspend fun runWork():Result = syncMutex.withLock {
         // Bound explicit retry results as well as thrown failures. Neither path may loop forever.
         if (runAttemptCount >= 5) return@withLock Result.failure()
         try { synchronizeUsage() }
@@ -55,13 +59,13 @@ class UsageSyncWorker(
         val alertPrefsSource = com.loadpredictor.data.local.AlertPreferencesDataSource(context)
 
         val now = System.currentTimeMillis()
-        val widgetState = WidgetSyncHelper.syncWidgetState(
-            context = context,
-            promoRepository = promoRepo,
-            usageRepository = usageRepo,
-            burnRateEngine = burnRateEngine,
-            now = now
-        )
+        val activePromo = promoRepo.getActivePromo().first()
+        val useCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(
+            promoRepo,usageRepo,getDailyUsageBreakdownUseCase=com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo))
+        val result = if (!usageRepo.hasUsageAccess()) com.loadpredictor.domain.model.BurnForecastResult.PermissionRequired
+            else useCase.execute(activePromo,now)
+        val widgetState = WidgetSyncHelper.fromForecastResult(result,now)
+        WidgetStatePreferences.saveStateAndNotify(context,widgetState)
 
         return when (widgetState) {
             WidgetState.PermissionRequired,
@@ -73,19 +77,15 @@ class UsageSyncWorker(
             }
             is WidgetState.Success -> {
                 try {
-                    val activePromo = promoRepo.getActivePromo().first() ?: return Result.success()
-                    val useCase = com.loadpredictor.domain.usecase.GetActiveBurnForecastUseCase(
-                        promoRepo, usageRepo, getDailyUsageBreakdownUseCase =
-                            com.loadpredictor.domain.usecase.GetDailyUsageBreakdownUseCase(usageRepo))
-                    val calculated = useCase.execute(activePromo, now)
-                    val forecast = (calculated as? com.loadpredictor.domain.model.BurnForecastResult.Success)?.forecast
+                    val forecast = (result as? com.loadpredictor.domain.model.BurnForecastResult.Success)?.forecast
                         ?: return Result.retry()
+                    val selectedPromo = forecast.promo
                     if (forecast.pace == BurnPace.EXPIRED) return Result.success()
 
                     // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
                     val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
                     val usedPercentage = (usedRatio * 100.0).toInt()
-                    val notifiedThresholds = notificationPrefs.getNotifiedThresholds(activePromo.id).first()
+                    val notifiedThresholds = notificationPrefs.getNotifiedThresholds(selectedPromo.id).first()
                     val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()
 
                     // 50%, 80%, 90% Milestones
@@ -97,29 +97,29 @@ class UsageSyncWorker(
                     for ((milestone, isEnabled) in milestones) {
                         if (usedPercentage >= milestone && !notifiedThresholds.contains(milestone.toString())) {
                             val recorded = !isEnabled || notificationHelper.showThresholdAlert(
-                                    activePromo.name,
+                                    selectedPromo.name,
                                     milestone,
                                     forecast.dataRemainingBytes
                                 )
-                            if (recorded) notificationPrefs.recordThresholdNotified(activePromo.id, milestone.toString())
+                            if (recorded) notificationPrefs.recordThresholdNotified(selectedPromo.id, milestone.toString())
                         }
                     }
 
                     // Premature Depletion Alert (Expiring Promos Only)
-                    if (!activePromo.isNoExpiry &&
+                    if (!selectedPromo.isNoExpiry &&
                         forecast.pace == BurnPace.BURNING_FAST &&
                         forecast.estimatedDepletionTimestamp != null &&
-                        activePromo.expirationTimestamp != null
+                        selectedPromo.expirationTimestamp != null
                     ) {
-                        val diffMs = activePromo.expirationTimestamp - forecast.estimatedDepletionTimestamp
+                        val diffMs = selectedPromo.expirationTimestamp - forecast.estimatedDepletionTimestamp
                         val diffHours = diffMs / 3_600_000L
                         if (diffHours >= 12L && !notifiedThresholds.contains("PREMATURE_DEPLETION")) {
                             val recorded = !alertPrefs.isPrematureEnabled || notificationHelper.showPrematureDepletionAlert(
-                                    activePromo.name,
+                                    selectedPromo.name,
                                     diffHours,
                                     forecast.dataRemainingBytes
                                 )
-                            if (recorded) notificationPrefs.recordThresholdNotified(activePromo.id, "PREMATURE_DEPLETION")
+                            if (recorded) notificationPrefs.recordThresholdNotified(selectedPromo.id, "PREMATURE_DEPLETION")
                         }
                     }
 

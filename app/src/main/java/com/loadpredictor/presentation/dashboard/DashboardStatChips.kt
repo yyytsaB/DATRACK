@@ -51,7 +51,9 @@ fun DashboardStatChips(
     }
 
     // 2. Days Left / Validity Chip
-    val (validityValue, validityLabel) = if (promo.isNoExpiry || promo.expirationTimestamp == null) {
+    val (validityValue, validityLabel) = if (forecast.pace == BurnPace.EXPIRED) {
+        Pair("Expired", "Validity")
+    } else if (promo.isNoExpiry || promo.expirationTimestamp == null) {
         Pair("No Expiry", "Validity")
     } else {
         val daysLeft = ((promo.expirationTimestamp - now).coerceAtLeast(0L) / TimeUnit.DAYS.toMillis(1)).toInt()
@@ -80,12 +82,9 @@ fun DashboardStatChips(
         }
     }
 
-    val halfSpread = computeHalfSpreadDays(forecast)
-    val paceSubLabel = if (halfSpread != null && forecast.pace != BurnPace.INSUFFICIENT_DATA && forecast.pace != BurnPace.DEPLETED) {
-        "± $halfSpread ${if (halfSpread == 1) "day" else "days"}"
-    } else {
-        null
-    }
+    val paceSubLabel = if(forecast.pace !in listOf(BurnPace.EXPIRED,BurnPace.DEPLETED,BurnPace.INSUFFICIENT_DATA))
+        com.loadpredictor.presentation.common.EstimateRangeCopy.label(forecast.depletionEarlyTimestamp,forecast.depletionLateTimestamp,now)
+        else null
 
     Row(
         modifier = modifier
@@ -158,8 +157,8 @@ private fun StatChip(
                     fontSize = 11.sp,
                     color = androidx.compose.ui.graphics.Color(0xFF8E99A8).copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 3,
+                    overflow = TextOverflow.Clip
                 )
             }
         }
