@@ -1,4 +1,6 @@
-# DATRACK Preview — dark mint UI/UX overhaul
+> Historical record: this appearance has been superseded by the user-supplied Downloads/ui reference port. See [reference-ui-implementation.md](reference-ui-implementation.md) for the current delivery.
+
+# DATRACK Preview â€” dark mint UI/UX overhaul
 
 ## Delivered
 - Cohesive charcoal/mint palette, Android type roles and consistent 20dp gutters and section spacing.

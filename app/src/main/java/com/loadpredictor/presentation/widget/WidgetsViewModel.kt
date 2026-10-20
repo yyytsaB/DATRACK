@@ -109,11 +109,11 @@ class WidgetsViewModel(
      *
      * @return True if the pin request was dispatched to the launcher; false if unsupported.
      */
-    fun requestPinWidget(appContext: Context): Boolean {
+    fun requestPinWidget(appContext: Context, wide: Boolean = false): Boolean {
         return try {
             val appWidgetManager = AppWidgetManager.getInstance(appContext)
             if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported) {
-                val provider = ComponentName(appContext, LoadPredictorWidgetReceiver::class.java)
+                val provider = ComponentName(appContext, if(wide) LoadPredictorWideWidgetReceiver::class.java else LoadPredictorWidgetReceiver::class.java)
                 appWidgetManager.requestPinAppWidget(provider, null, null)
             } else {
                 false

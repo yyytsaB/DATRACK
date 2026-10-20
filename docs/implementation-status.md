@@ -1,3 +1,5 @@
+> Historical record: this appearance has been superseded by the user-supplied Downloads/ui reference port. See [reference-ui-implementation.md](reference-ui-implementation.md) for the current delivery.
+
 # UI rollback requested by user
 
 The original appearance is restored from `fc927c1`, retaining the core feature fixes and reliability work. This supersedes the UI redesign statements in the historical milestone record below.
@@ -10,7 +12,7 @@ The earlier redesign's adaptive navigation/light theme were appearance changes a
 
 ---
 
-# Implementation status — 20 October 2026
+# Implementation status â€” 20 October 2026
 
 ## Committed milestones
 
@@ -57,7 +59,7 @@ Widgets use concise static content instead of a decorative chart or font-depende
 
 The historical burn index remains available in the engine, but user-facing risk is reconciled to the actual selected projection. Estimated ranges are presented as estimates, not statistically calibrated confidence bounds.
 
-## Remaining release gate — not claimed complete
+## Remaining release gate â€” not claimed complete
 
 - [ ] Multi-day comparison with Android mobile-data settings and carrier remaining balance, accounting for specialized/zero-rated buckets.
 - [ ] Another Android version and another launcher/OEM.

@@ -6,28 +6,28 @@ import androidx.compose.ui.graphics.Color
 // ---------------------------------------------------------------------------
 // Core Surface & Elevation Hierarchy (Near-Black -> Layer 1 -> Layer 2 -> Recessed)
 // ---------------------------------------------------------------------------
-val DarkBackground = Color(0xFF0D1416)       // Deepest near-black canvas
+val DarkBackground = Color(0xFF0D1117)       // Deepest near-black canvas
 val SurfaceBase = DarkBackground
 
-val SurfaceLayer1 = Color(0xFF172225)        // Main cards & dialog surface
+val SurfaceLayer1 = Color(0xFF171B22)        // Main cards & dialog surface
 val DarkSurfaceVariant = SurfaceLayer1
 
-val SurfaceLayer2 = Color(0xFF213034)        // Elevated tiles, input containers, preset chips
+val SurfaceLayer2 = Color(0xFF1E2536)        // Elevated tiles, input containers, preset chips
 val DarkSurfaceHighlight = SurfaceLayer2
 
-val SurfaceRecessed = Color(0xFF101B1E)      // Recessed advisory boxes & chart stage
+val SurfaceRecessed = Color(0xFF11161F)      // Recessed advisory boxes & chart stage
 val DarkSurface = SurfaceRecessed
 
-val DarkOutline = Color(0xFF34464A)          // Structural card & element border
-val BorderHighlight = Color(0xFF34464A)      // Subtle top highlight border
-val DarkOutlineVariant = Color(0xFF26373B)   // Ultra subtle separators
+val DarkOutline = Color(0xFF2C3340)          // Structural card & element border
+val BorderHighlight = Color(0xFF2C3340)      // Subtle top highlight border
+val DarkOutlineVariant = Color(0xFF232936)   // Ultra subtle separators
 
 // ---------------------------------------------------------------------------
 // Typography High & Low Emphasis
 // ---------------------------------------------------------------------------
 val TextHighEmphasis = Color(0xFFFFFFFF)     // Pure crisp white for headers & hero numbers
-val TextMediumEmphasis = Color(0xFFB0C2C5)   // Slate gray for labels & body (contrast > 5.9:1)
-val TextLowEmphasis = Color(0xFF96ADB1)      // Muted slate for captions & timestamps
+val TextMediumEmphasis = Color(0xFF9CA6B5)   // Slate gray for labels & body (contrast > 5.9:1)
+val TextLowEmphasis = Color(0xFF8994A5)      // Muted slate for captions & timestamps
 
 // ---------------------------------------------------------------------------
 // Light-Card Surface & Typography Tokens (For Widget Light Preview Cards)
@@ -45,10 +45,10 @@ val DarkLinearTrack = Color(0xFF252D3D)      // Dark linear progress bar track
 // ---------------------------------------------------------------------------
 // Primary Brand & Interactive Accent (Teal / Electric Mint)
 // ---------------------------------------------------------------------------
-val MintPrimary = Color(0xFF70E0BE)          // Electric Mint accent for buttons, FAB, focus rings, sliders
+val MintPrimary = Color(0xFF3DD6C8)          // Electric Mint accent for buttons, FAB, focus rings, sliders
 val MintOnPrimary = Color(0xFF0A1513)        // Deep dark text on mint (contrast > 14:1)
-val MintPrimaryContainer = Color(0xFF193F36) // Deep mint container for active chips/badges
-val MintOnPrimaryContainer = Color(0xFFABF2D9)// Bright mint text on deep container (contrast > 9:1)
+val MintPrimaryContainer = Color(0xFF163431) // Deep mint container for active chips/badges
+val MintOnPrimaryContainer = Color(0xFF9FF0E8)// Bright mint text on deep container (contrast > 9:1)
 val MintGlow = Color(0x6600F5D4)             // Subtle ambient mint glow
 
 // ---------------------------------------------------------------------------
@@ -70,19 +70,19 @@ val PurpleGradientBrush = Brush.verticalGradient(
 // ---------------------------------------------------------------------------
 // Semantic Pace Status Colors (Distinct from Brand Buttons)
 // ---------------------------------------------------------------------------
-val PaceOnTrack = Color(0xFF05D686)          // Crisp Emerald Green
+val PaceOnTrack = Color(0xFF4ADE80)          // Crisp Emerald Green
 val PaceOnTrackContainer = Color(0xFF063D28) // Deep emerald background
 val PaceOnTrackText = Color(0xFF6EE7B7)      // Light emerald text
 
-val PaceConservative = Color(0xFF38BDF8)     // Sky Cyan Blue
+val PaceConservative = Color(0xFF4ADE80)     // Sky Cyan Blue
 val PaceConservativeContainer = Color(0xFF0C3B52)// Deep cyan background
 val PaceConservativeText = Color(0xFF7DD3FC) // Light cyan text
 
-val PaceCalibrating = Color(0xFFFBBF24)      // Warm Amber Gold
-val PaceCalibratingContainer = Color(0xFF3D2E0A)// Deep amber background
-val PaceCalibratingText = Color(0xFFFDE68A)  // Light amber text
+val PaceCalibrating = Color(0xFF60A5FA)      // Warm Amber Gold
+val PaceCalibratingContainer = Color(0xFF192C47)// Deep amber background
+val PaceCalibratingText = Color(0xFF93C5FD)  // Light amber text
 
-val PaceCritical = Color(0xFFFF5353)         // Coral Red
+val PaceCritical = Color(0xFFF87171)         // Coral Red
 val PaceCriticalContainer = Color(0xFF4A1515)// Deep red background
 val PaceCriticalText = Color(0xFFFFB4B4)     // Light red text
 

@@ -164,6 +164,7 @@ class MainActivity : ComponentActivity() {
                         NavDestination.HOME -> {
                             MainScreenContent(
                                 uiState = uiState,
+                                onRefresh = { mainViewModel.refresh() },
                                 onGrantPermissionClick = {
                                     startActivity(usageAccessHelper.createUsageAccessSettingsIntent())
                                 },
@@ -223,7 +224,8 @@ fun MainScreenContent(
     onGrantPermissionClick: () -> Unit,
     onNavigateToPromos: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRefresh: () -> Unit = {}
 ) {
     when {
         uiState.isLoading -> {
@@ -235,86 +237,27 @@ fun MainScreenContent(
             }
         }
         !uiState.isUsagePermissionGranted -> {
-            UsagePermissionRequiredCard(
-                onGrantPermissionClick = onGrantPermissionClick,
-                modifier = modifier
-            )
+            com.loadpredictor.presentation.common.ReferenceEmptyState(true,onGrantPermissionClick,modifier)
         }
         uiState.forecastResult is BurnForecastResult.NoActivePromo -> {
-            com.loadpredictor.presentation.common.NoActivePromoScreen(
-                onConfigureClick = onNavigateToPromos,
-                modifier = modifier
-            )
+            com.loadpredictor.presentation.common.ReferenceEmptyState(false,onNavigateToPromos,modifier)
         }
         else -> {
             DashboardView(
                 uiState = uiState,
                 onNavigateToPromos = onNavigateToPromos,
                 onNavigateToHistory = onNavigateToHistory,
+                onRefresh = onRefresh,
                 modifier = modifier
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardView(
-    uiState: MainUiState,
-    onNavigateToPromos: () -> Unit,
-    onNavigateToHistory: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        ScreenHeader("DATRACK", "Your data, a little clearer. · Preview")
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
-        ) {
-            when (val forecastResult = uiState.forecastResult) {
-                is BurnForecastResult.NoActivePromo -> {
-                    NoActivePromoCard(onConfigureClick = onNavigateToPromos)
-                }
-                is BurnForecastResult.Success -> {
-                    LiveForecastHeroSection(
-                        forecast = forecastResult.forecast,
-                        dailyAvgBytes = if (forecastResult.forecast.burnRateBytesPerHour > 0.0) {
-                            kotlin.math.round(forecastResult.forecast.burnRateBytesPerHour * 24.0).toLong()
-                        } else {
-                            0L
-                        }
-                    )
-
-                    // Daily Usage Breakdown Teaser Strip
-                    DailyUsageTeaserCard(
-                        buckets = uiState.dailyUsageBreakdown,
-                        onViewHistoryClick = onNavigateToHistory
-                    )
-                }
-                is BurnForecastResult.PermissionRequired -> {
-                    // Handled upstream in MainScreenContent
-                }
-                is BurnForecastResult.Error -> {
-                    uiState.lastSuccessfulForecast?.let { previous ->
-                        Text("Stale reading: ${DataFormatter.formatBytes(previous.dataRemainingBytes)} for ${previous.promo.name}", color = TextMediumEmphasis)
-                    }
-                    ErrorForecastCard(
-                        message = forecastResult.message,
-                        onManageClick = onNavigateToPromos
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
+fun DashboardView(uiState: MainUiState, onNavigateToPromos: () -> Unit, onNavigateToHistory: () -> Unit,
+    modifier: Modifier = Modifier, onRefresh: () -> Unit = {}) {
+    com.loadpredictor.presentation.dashboard.ReferenceDashboard(uiState,onNavigateToPromos,onNavigateToHistory,onRefresh,modifier)
 }
 
 @Composable

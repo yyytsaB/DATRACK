@@ -1,315 +1,143 @@
 package com.loadpredictor.presentation.promo
-
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.loadpredictor.domain.model.Promo
-import com.loadpredictor.domain.model.SimSlot
-import com.loadpredictor.presentation.theme.BorderHighlight
-import com.loadpredictor.presentation.theme.DarkBackground
-import com.loadpredictor.presentation.theme.DarkOutline
-import com.loadpredictor.presentation.theme.DarkOutlineVariant
-import com.loadpredictor.presentation.theme.MintOnPrimary
-import com.loadpredictor.presentation.theme.MintPrimary
-import com.loadpredictor.presentation.theme.MintPrimaryContainer
-import com.loadpredictor.presentation.theme.PaceCritical
-import com.loadpredictor.presentation.theme.SurfaceLayer1
-import com.loadpredictor.presentation.theme.SurfaceLayer2
-import com.loadpredictor.presentation.theme.SurfaceRecessed
-import com.loadpredictor.presentation.theme.TextHighEmphasis
-import com.loadpredictor.presentation.theme.TextMediumEmphasis
+import com.loadpredictor.domain.model.*
+import com.loadpredictor.presentation.common.*
+import com.loadpredictor.presentation.theme.*
+import com.loadpredictor.util.DataFormatter
+import java.math.BigDecimal
 
-/** Saved contexts keep their full names above a separate action row. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PromoManagementScreen(
-    viewModel: PromoViewModel,
-    onNavigateBack: (() -> Unit)? = null
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var pendingDelete by remember { mutableStateOf<Promo?>(null) }
-    var showAddDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    var promoToEdit by remember { mutableStateOf<Promo?>(null) }
-    var selectedSimFilter by remember { mutableStateOf<SimSlot?>(null) } // null = All SIMs
-
-    val filteredPromos = remember(uiState.promos, selectedSimFilter) {
-        if (selectedSimFilter == null) {
-            uiState.promos
-        } else {
-            uiState.promos.filter { it.simSlot == selectedSimFilter }
-        }
-    }
-
-    Scaffold(
-        containerColor = DarkBackground,
-        topBar = {
-            com.loadpredictor.presentation.common.ScreenHeader("Promos", "Choose the data plan you’re tracking.")
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            uiState.errorMessage?.let { message -> item { Text(message, color = PaceCritical) } }
-            item {
-                Button(onClick = { showAddDialog = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add promo")
-                }
-            }
-            // SIM 1 / SIM 2 Filter Segmented Buttons (Matching tab/pill style in preview (4))
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val filters = listOf(
-                        Pair(null, "All SIMs"),
-                        Pair(SimSlot.SIM_1, "SIM 1"),
-                        Pair(SimSlot.SIM_2, "SIM 2")
-                    )
-
-                    filters.forEach { (slot, title) ->
-                        val isSelected = selectedSimFilter == slot
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MintPrimaryContainer else Color(0xFF213034),
-                            border = if (isSelected) BorderStroke(1.dp, MintPrimary) else null,
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp),
-                            onClick = { selectedSimFilter = slot }
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(vertical = 12.dp)
-                            ) {
-                                Text(
-                                    text = title,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MintPrimary else TextMediumEmphasis
-                                )
+fun PromoManagementScreen(viewModel:PromoViewModel,onNavigateBack:(()->Unit)?=null) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var sim by rememberSaveable {mutableStateOf(SimSlot.SIM_1)}
+    var adding by rememberSaveable {mutableStateOf(false)}
+    var editId by rememberSaveable {mutableStateOf<Long?>(null)}
+    var detailId by rememberSaveable {mutableStateOf<Long?>(null)}
+    var deleteId by rememberSaveable {mutableStateOf<Long?>(null)}
+    var seeAll by rememberSaveable {mutableStateOf(false)}
+    val now=System.currentTimeMillis()
+    val promos=state.promos.filter {it.simSlot==sim}
+    val active=promos.firstOrNull {it.isActive}
+    val inactive=promos.filterNot {it.isActive}
+    val past=inactive.filter {it.isExpired(now)||it.remainingBytes(it.lastSyncDataUsedBytes)==0L}
+    val saved=inactive.filterNot {it in past}
+    Column(Modifier.fillMaxSize()) {
+        ReferenceTopBar("Promos",listOf("Add promo" to {adding=true},"Show all load history" to {seeAll=true}))
+        Box(Modifier.weight(1f)) {
+            LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=100.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                state.errorMessage?.let {item {Text(it,color=PaceCritical,style=MaterialTheme.typography.bodySmall)}}
+                item {
+                    Row(Modifier.fillMaxWidth().background(SurfaceLayer1,RoundedCornerShape(12.dp)).padding(3.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                        SimSlot.entries.forEach {slot ->
+                            val selected=slot==sim
+                            Surface(onClick={sim=slot},modifier=Modifier.weight(1f).heightIn(min=48.dp),shape=RoundedCornerShape(10.dp),color=if(selected) MintPrimary else Color.Transparent) {
+                                Box(Modifier.padding(vertical=12.dp),contentAlignment=Alignment.Center) {Text(if(slot==SimSlot.SIM_1) "SIM 1" else "SIM 2",color=if(selected) MintOnPrimary else TextMediumEmphasis,style=MaterialTheme.typography.labelLarge)}
                             }
                         }
                     }
                 }
-            }
-
-            // Informative sample disclaimer callout
-            item {
-                Surface(
-                    color = SurfaceRecessed,
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, DarkOutlineVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(
-                                    color = SurfaceLayer1,
-                                    shape = RoundedCornerShape(8.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MintPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Select a promo to track it. Usage covers all mobile data on this device; SIM labels are for your reference.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMediumEmphasis,
-                            lineHeight = 18.sp
-                        )
+                if(active!=null) item {ActiveLoadCard(active,state.activeForecast){detailId=active.id}}
+                else item {
+                    Surface(shape=RoundedCornerShape(16.dp),color=SurfaceLayer1) {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("No active promo for this SIM",color=TextHighEmphasis,style=MaterialTheme.typography.titleSmall)
+                        Text("Choose a saved promo or add a new one. Tracking uses device-total mobile data.",color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)
+                        TextButton(onClick={adding=true}) {Text("Add promo")}
+                    }}
+                }
+                if(saved.isNotEmpty()) {
+                    item {ReferenceSection("Saved promos")}
+                    items(saved,key={"saved-${it.id}"}) {p ->
+                        Surface(shape=RoundedCornerShape(16.dp),color=SurfaceLayer1) {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                            Row(verticalAlignment=Alignment.Top) {
+                                Column(Modifier.weight(1f)) {Text(p.name,color=TextHighEmphasis,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text(DataFormatter.formatDateRange(p.startTimestamp,p.expirationTimestamp),color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)}
+                                IconButton(onClick={detailId=p.id}){Icon(Icons.Outlined.MoreHoriz,"Promo details",tint=TextMediumEmphasis)}
+                            }
+                            ReferenceProgress(p.remainingBytes(p.lastSyncDataUsedBytes).toFloat()/p.totalAllowanceBytes)
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                                Text("${DataFormatter.formatBytes(p.remainingBytes(p.lastSyncDataUsedBytes))} · saved balance",Modifier.weight(1f),color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)
+                                TextButton(onClick={viewModel.selectActivePromo(p.id)}){Text("Track")}
+                            }
+                        }}
                     }
                 }
+                item {ReferenceSection("Load history",if(seeAll) "Show less" else "See all",{seeAll=!seeAll})}
+                if(past.isEmpty()) item {Text("Your past promos will appear here when they expire or their data is used up.",color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)}
+                items(if(seeAll) past else past.take(3),key={"past-${it.id}"}) {p -> PastLoadRow(p){detailId=p.id}}
+                item {Text("SIM labels identify your selected promo context. Usage is measured across this device’s mobile connections.",color=TextLowEmphasis,style=MaterialTheme.typography.labelSmall)}
             }
-
-            item {
-                Text(
-                    text = "Saved Promos (${filteredPromos.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextHighEmphasis
-                )
+            FloatingActionButton(onClick={adding=true},containerColor=MintPrimary,contentColor=MintOnPrimary,shape=RoundedCornerShape(16.dp),modifier=Modifier.align(Alignment.BottomEnd).padding(end=20.dp,bottom=20.dp)) {
+                Icon(Icons.Outlined.Add,"Add promo")
             }
-
-            if (filteredPromos.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, BorderHighlight)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (selectedSimFilter != null) "No promos for this SIM slot." else "No promos configured yet.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextHighEmphasis
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Tap the + button below to add your active mobile data promo.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMediumEmphasis
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(filteredPromos, key = { it.id }) { promo ->
-                    val isActive = (uiState.activePromo?.id == promo.id)
-                    PromoItemCard(
-                        promo = promo,
-                        isActive = isActive,
-                        activeForecast = if (isActive) uiState.activeForecast else null,
-                        onSelectActive = { viewModel.selectActivePromo(promo.id) },
-                        onEdit = { promoToEdit = promo },
-                        onDelete = { pendingDelete = promo }
-                    )
-                }
-            }
-        }
-
-        pendingDelete?.let { promo ->
-            androidx.compose.material3.AlertDialog(onDismissRequest = { pendingDelete = null },
-                title = { Text("Delete ${promo.name}?") },
-                text = { Text("This removes the saved promo${if (promo.isActive) " and active tracking context" else ""}.") },
-                confirmButton = { androidx.compose.material3.TextButton(onClick = { viewModel.deletePromo(promo); pendingDelete = null }) { Text("Delete") } },
-                dismissButton = { androidx.compose.material3.TextButton(onClick = { pendingDelete = null }) { Text("Keep promo") } })
-        }
-        if (showAddDialog || promoToEdit != null) {
-            PromoEntryDialog(
-                promoToEdit = promoToEdit,
-                saveError = uiState.errorMessage,
-                isSaving = uiState.isSaving,
-                onDismissRequest = {
-                    showAddDialog = false
-                    promoToEdit = null
-                },
-                onSavePromo = { id, name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive, existingPromo, carrier, priceCentavos ->
-                    viewModel.savePromo(
-                        id = id,
-                        name = name,
-                        allowanceBytes = allowanceBytes,
-                        startTimestamp = startTimestamp,
-                        expirationTimestamp = expirationTimestamp,
-                        initialUsageOffsetBytes = initialUsageOffsetBytes,
-                        simSlot = simSlot,
-                        isActive = isActive,
-                        existingPromo = existingPromo, carrier = carrier, priceCentavos = priceCentavos,
-                        onSuccess = {
-                            showAddDialog = false
-                            promoToEdit = null
-                        }
-                    )
-                }
-            )
         }
     }
+    val editing=state.promos.firstOrNull {it.id==editId}
+    if(adding || editing!=null) PromoEntryDialog(promoToEdit=editing,saveError=state.errorMessage,isSaving=state.isSaving,
+        onDismissRequest={adding=false;editId=null},onSavePromo={id,name,allowance,start,expiry,offset,slot,isActive,existing,carrier,price ->
+            viewModel.savePromo(id=id,name=name,allowanceBytes=allowance,startTimestamp=start,expirationTimestamp=expiry,initialUsageOffsetBytes=offset,simSlot=slot,isActive=isActive,existingPromo=existing,carrier=carrier,priceCentavos=price,
+                onSuccess={adding=false;editId=null})
+        })
+    state.promos.firstOrNull {it.id==detailId}?.let {p ->
+        AlertDialog(onDismissRequest={detailId=null},title={Text(p.name)},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Text("${if(p.simSlot==SimSlot.SIM_1) "SIM 1" else "SIM 2"}${p.carrier?.let {" · $it"}.orEmpty()}")
+            Text("Allowance: ${DataFormatter.formatBytes(p.totalAllowanceBytes)}")
+            Text(DataFormatter.formatDateRange(p.startTimestamp,p.expirationTimestamp))
+            Text(if(p.isExpired(now)) "Expired · unused balance is unavailable" else if(p.isActive) "Currently tracking" else "Saved context · balance is a snapshot")
+            p.priceCentavos?.let {Text("Price paid: ${loadPrice(it)}")}
+            Row {TextButton(onClick={detailId=null;editId=p.id}){Text("Edit")};TextButton(onClick={detailId=null;deleteId=p.id}){Text("Delete",color=PaceCritical)}}
+        }},confirmButton={TextButton(onClick={detailId=null}){Text("Done")}})
+    }
+    state.promos.firstOrNull {it.id==deleteId}?.let {p ->AlertDialog(onDismissRequest={deleteId=null},title={Text("Delete ${p.name}?")},text={Text("This removes the saved promo and its load-history record.")},confirmButton={TextButton(onClick={viewModel.deletePromo(p);deleteId=null}){Text("Delete",color=PaceCritical)}},dismissButton={TextButton(onClick={deleteId=null}){Text("Keep promo")}})}
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PromoItemCard(
-    promo: Promo, isActive: Boolean,
-    activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
-    onSelectActive: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit
-) {
-    val expired = promo.isExpired(System.currentTimeMillis())
-    val remaining = if (isActive && activeForecast != null) activeForecast.dataRemainingBytes else promo.remainingBytes(promo.lastSyncDataUsedBytes)
-    val fraction = (remaining.toFloat() / promo.totalAllowanceBytes.coerceAtLeast(1)).coerceIn(0f, 1f)
-    Surface(color = if (isActive) SurfaceLayer2 else SurfaceLayer1,
-        shape = RoundedCornerShape(16.dp),
-        border = if (isActive) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.65f)) else null) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(promo.name, style = MaterialTheme.typography.titleLarge, color = TextHighEmphasis)
-            Text("${if (promo.simSlot == SimSlot.SIM_1) "SIM 1" else "SIM 2"} · ${if (isActive) "Tracking now" else "Saved promo"}",
-                style = MaterialTheme.typography.bodyMedium, color = if (isActive) MintPrimary else TextMediumEmphasis)
-            Text(if (expired) "Expired · unused data is no longer available" else formatPromoDateRange(promo),
-                style = MaterialTheme.typography.bodyMedium, color = TextMediumEmphasis)
-            Text("${com.loadpredictor.util.DataFormatter.formatBytes(remaining)} ${if (expired) "unused" else "remaining"}",
-                style = MaterialTheme.typography.titleMedium, color = TextHighEmphasis)
-            LinearProgressIndicator(progress = { if (expired) 0f else fraction }, Modifier.fillMaxWidth().height(6.dp),
-                color = if (isActive) MintPrimary else TextMediumEmphasis, trackColor = DarkOutline, drawStopIndicator = {})
-            Text("of ${com.loadpredictor.util.DataFormatter.formatBytes(promo.totalAllowanceBytes)}${if (!isActive) " · saved snapshot" else ""}",
-                style = MaterialTheme.typography.bodySmall, color = TextMediumEmphasis)
-            HorizontalDivider(color = DarkOutlineVariant)
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (isActive) {
-                    Text("Active promo", Modifier.padding(vertical = 14.dp, horizontal = 8.dp), style = MaterialTheme.typography.labelLarge, color = MintPrimary)
-                } else {
-                    FilledTonalButton(onClick = onSelectActive, modifier = Modifier.heightIn(min = 48.dp)) { Text("Track promo") }
+private fun ActiveLoadCard(p:Promo,f:BurnForecast?,onClick:()->Unit) {
+    val expired=p.isExpired(System.currentTimeMillis())
+    val left=f?.dataRemainingBytes?:p.remainingBytes(p.lastSyncDataUsedBytes)
+    Surface(onClick=onClick,shape=RoundedCornerShape(16.dp),color=SurfaceLayer1,border=BorderStroke(1.dp,MintPrimary.copy(alpha=.25f))) {
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment=Alignment.Top,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                    ReferenceChip(if(expired) "Expired" else "Active now",if(expired) PaceCritical else PaceOnTrack)
+                    Text(p.name,color=TextHighEmphasis,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+                    Text(listOfNotNull(p.carrier,if(p.expirationTimestamp==null) "No expiry" else "${if(expired) "Expired" else "Expires"} ${DataFormatter.formatDate(p.expirationTimestamp)}").joinToString(" · "),color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)
                 }
-                TextButton(onClick = onEdit, modifier = Modifier.heightIn(min = 48.dp)) { Text("Edit") }
-                TextButton(onClick = onDelete, modifier = Modifier.heightIn(min = 48.dp), colors = ButtonDefaults.textButtonColors(contentColor = PaceCritical)) { Text("Delete") }
+                Column(horizontalAlignment=Alignment.End) {
+                    Text(if(expired) "Ended" else DataFormatter.formatBytes(left),color=MintPrimary,style=MaterialTheme.typography.headlineSmall,fontFamily=DataFontFamily)
+                    Text(if(expired) "not usable" else "remaining",color=TextMediumEmphasis,style=MaterialTheme.typography.labelSmall)
+                }
             }
+            ReferenceProgress(if(expired) 0f else left.toFloat()/p.totalAllowanceBytes)
+            Text("${DataFormatter.formatBytes(p.totalAllowanceBytes-left)} of ${DataFormatter.formatBytes(p.totalAllowanceBytes)} used",color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)
         }
     }
 }
-
-private fun formatPromoDateRange(promo: Promo): String {
-    return com.loadpredictor.util.DataFormatter.formatDateRange(promo.startTimestamp, promo.expirationTimestamp)
+@Composable private fun PastLoadRow(p:Promo,onClick:()->Unit) {
+    val used=p.totalAllowanceBytes-p.remainingBytes(p.lastSyncDataUsedBytes)
+    Column {
+        Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(40.dp).background(MintPrimary.copy(alpha=.08f),RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center){Icon(Icons.Outlined.SimCard,null,Modifier.size(20.dp),tint=MintPrimary)}
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+                Text(p.name,color=TextHighEmphasis,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                Text("${DataFormatter.formatBytes(p.totalAllowanceBytes)} · ${DataFormatter.formatDateRange(p.startTimestamp,p.expirationTimestamp)}",color=TextMediumEmphasis,style=MaterialTheme.typography.bodySmall)
+                Text("Used ${((used.toDouble()/p.totalAllowanceBytes)*100).toInt()}% · saved snapshot",color=TextLowEmphasis,style=MaterialTheme.typography.labelSmall)
+            }
+            p.priceCentavos?.let {Text(loadPrice(it),color=TextMediumEmphasis,fontFamily=DataFontFamily,style=MaterialTheme.typography.bodySmall)}
+            Icon(Icons.Outlined.ChevronRight,null,tint=TextLowEmphasis,modifier=Modifier.size(18.dp))
+        }
+        HorizontalDivider(color=DarkOutlineVariant)
+    }
 }
+private fun loadPrice(value:Long):String="₱"+BigDecimal(value).movePointLeft(2).stripTrailingZeros().toPlainString()

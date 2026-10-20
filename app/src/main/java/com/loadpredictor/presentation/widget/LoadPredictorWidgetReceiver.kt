@@ -9,7 +9,7 @@ import com.loadpredictor.worker.WorkManagerScheduler
 /**
  * BroadcastReceiver responsible for receiving app widget lifecycle events and binding [LoadPredictorWidget].
  */
-class LoadPredictorWidgetReceiver : GlanceAppWidgetReceiver() {
+open class LoadPredictorWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LoadPredictorWidget()
 
     override fun onUpdate(
