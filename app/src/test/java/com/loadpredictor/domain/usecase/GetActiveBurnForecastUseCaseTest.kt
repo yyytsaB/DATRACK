@@ -488,4 +488,25 @@ class GetActiveBurnForecastUseCaseTest {
         assertNull(forecast.depletionEarlyTimestamp)
         assertNull(forecast.depletionLateTimestamp)
     }
+    @Test fun `revised Android counters recalibrate velocity without rewriting the saved offset`()=runTest {
+        val promo=Promo(id=1,name="Saved",totalAllowanceBytes=10000000,startTimestamp=0,
+            initialUsageOffsetBytes=100,lastActiveBurnRate=10.0,lastSyncDataUsedBytes=2000,lastSyncTimestamp=2000)
+        val repo=FakePromoRepository(promo);val usage=FakeUsageRepository(usageBytes=1000)
+        val useCase=GetActiveBurnForecastUseCase(repo,usage)
+        assertTrue(useCase.execute(promo,3600000) is BurnForecastResult.Error)
+        val revised=repo.activePromoFlow.value!!
+        assertNull(revised.lastActiveBurnRate);assertEquals(1000L,revised.lastSyncDataUsedBytes)
+        assertEquals(100L,revised.initialUsageOffsetBytes);assertEquals(0L,revised.startTimestamp)
+        val result=useCase.execute(revised,3600001) as BurnForecastResult.Success
+        assertEquals(9998900L,result.forecast.dataRemainingBytes)
+    }
+
+    @Test fun `terminal expiry takes priority over revised historical counters`()=runTest {
+        val promo=Promo(id=1,name="Expired",totalAllowanceBytes=10000000,startTimestamp=0,
+            expirationTimestamp=3000,lastActiveBurnRate=10.0,lastSyncDataUsedBytes=2000,lastSyncTimestamp=2000)
+        val repo=FakePromoRepository(promo)
+        val result=GetActiveBurnForecastUseCase(repo,FakeUsageRepository(usageBytes=1000)).execute(promo,3600000)
+        assertEquals(BurnPace.EXPIRED,(result as BurnForecastResult.Success).forecast.pace)
+    }
+
 }

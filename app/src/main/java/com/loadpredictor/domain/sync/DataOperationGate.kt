@@ -11,10 +11,18 @@ import kotlinx.coroutines.sync.withLock
  * Do not launch concurrent child operations while owning this gate. */
 object DataOperationGate {
     private val mutex=Mutex()
+    @Volatile var isRecoveryRequired=false
+        private set
+    fun requireRecovery(){isRecoveryRequired=true}
+    fun recoveryCompleted(){isRecoveryRequired=false}
+    suspend fun <T> recovery(block:suspend ()->T):T = mutex.withLock {withContext(Owner()){block()}}
     private object Key:CoroutineContext.Key<Owner>
     private class Owner:AbstractCoroutineContextElement(Key)
     suspend fun <T> exclusive(block:suspend ()->T):T {
         if(currentCoroutineContext()[Key]!=null) return block()
-        return mutex.withLock { withContext(Owner()) { block() } }
+        return mutex.withLock {
+            check(!isRecoveryRequired){"A restore needs recovery. Open Data and support to retry."}
+            withContext(Owner()) { block() }
+        }
     }
 }

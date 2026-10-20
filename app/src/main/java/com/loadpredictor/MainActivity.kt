@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity() {
                 )
                 val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
-                var showDataTools by rememberSaveable { mutableStateOf(false) }
+                var showDataTools by rememberSaveable { mutableStateOf(com.loadpredictor.domain.sync.DataOperationGate.isRecoveryRequired) }
                 var currentDestination by rememberSaveable { mutableStateOf(NavDestination.HOME) }
 
                 // Lifecycle-aware foreground ticker: refreshes immediately on entry (and on resume from Settings)
@@ -232,7 +232,10 @@ class MainActivity : ComponentActivity() {
                     }
                     }
                 }
-                if(showDataTools) com.loadpredictor.presentation.tools.DataToolsDialog {showDataTools=false}
+                if(showDataTools) com.loadpredictor.presentation.tools.DataToolsDialog(onRestored={
+                    mainViewModel.refresh();historyViewModel.refresh();widgetsViewModel.refresh()
+                    WorkManagerScheduler.enqueueImmediateSync(context,"configuration_restored")
+                },onDismiss={showDataTools=false})
             }
         }
     }

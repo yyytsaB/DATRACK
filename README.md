@@ -1,62 +1,58 @@
 # DATRACK — prepaid data runway
 
-A native Android app that estimates whether a manually configured mobile-data allowance will last until its actual expiry. DATRACK measures device mobile traffic through Android Usage Access; it does not obtain a carrier balance.
+Native Android estimates for a manually configured mobile-data allowance. Device mobile usage is not a carrier balance, and SIM labels do not isolate per-SIM billing.
 
-## Current implementation
+## Current scope
+Kotlin, Compose, Room schema 4, DataStore, WorkManager and Glance. Original appearance retained. Reliability hardening, bounded local diagnostics and configuration backup/restore are the approved work for 1.1.0. Carrier reconciliation, budgets, new attribution features and carrier automation remain on hold.
 
-- Kotlin, Jetpack Compose Material 3, Room schema v4, DataStore, WorkManager and Glance.
-- Five destinations: Home, Promos, History, Alerts and Widgets.
-- Separate allowance, historical usage offset, measurement start and optional actual expiry timestamp. The editor supports exact expiry date/time for mid-cycle setup.
-- Explicit expired/depleted/calibrating states and consistent forward risk classification across the app, widgets and background alerts.
-- Adaptive EMA sampling, with a rolling mean of up to seven completed local calendar days when at least three full days are available. Partial days do not train the daily model.
-- Shared offset-plus-measured balance arithmetic, including inactive snapshots.
-- Threshold alerts at 50/80/90% and premature depletion. Permission/channel-blocked submissions are not marked delivered. Disabling a threshold intentionally consumes it when crossed.
-- About-hourly background checks, with explicit user/mutation-triggered refresh. Android can delay work; its usage statistics can lag actual traffic.
-- Original mint/dark visual design restored at user request: ring gauge, typography, navigation, promo cards and compact/wide widget graphics. Functional fixes remain integrated into the original screens.
-- Scrollable history chart covering the selected range, accessible day/value labels and lazy daily rows. History is capped to a rolling 90-day window, not lifetime retention.
-- Original compact/wide launcher widget layouts with ring/sparkline graphics, concise ETA wording, a real refresh action and tap-to-open.
+## Reliability
+- Save and activation use one Room transaction; missing targets do not deactivate the saved context.
+- Cosmetic edits preserve current checkpoints; older or differently based observations cannot overwrite them.
+- A shared coroutine gate serializes edits, forecast evaluation, worker alerts and restore. Widget and alert results use one worker calculation.
+- Expired/depleted/permission/stale states remain explicit. Counter revisions recalibrate velocity without silently changing the saved offset. Completed-day forecasts and estimated ranges remain estimates, not calibrated confidence intervals.
+- Original widget graphics, tap-to-open and refresh remain. WorkManager updates are about hourly and can be delayed by Android.
 
-## Measurement limits
+## Data and support
+Open the small three-dot action on Home.
 
-Usage is mobile-only and aggregated across the device's SIMs. Selecting a SIM in DATRACK labels a manual promo context; it does not switch the phone's mobile-data SIM or isolate its traffic. Reactivating an older promo continues to query its measurement window; inactive periods are not automatically excluded.
+- **Export configuration backup:** an unencrypted versioned JSON file saved through Android's system file picker. Includes promo IDs/configuration, offsets, alert settings and notification milestones. Excludes Android traffic history, forecast caches, work queues and widget IDs. Keep the file private.
+- **Review backup to restore:** validates the complete file (maximum 1 MB / 1000 promos), shows replacement scope, and requires a fresh safety export before explicit replacement. A changed configuration invalidates an older safety copy.
+- **Interrupted restore:** a durable private journal completes replacement of Room data and preferences on startup. Edits are blocked until recovery completes. A damaged target falls back to the validated private safety copy. Retry recovery is available in the same dialog.
+- **Alerts after restore:** already-crossed thresholds are consumed on the first successful restored reading, avoiding a replay of old notifications.
+- **Export support report:** bounded private diagnostics (up to 1000 events or seven days). Reports include version, Android API, outcomes, timestamps, usage windows and byte counts; no notification contents or unrelated app listings. Export is explicit; nothing is uploaded automatically.
 
-Carrier-specific unlimited apps, specialized bonus pools and zero-rated traffic cannot be separated. The tracked allowance should represent the general pool. Remaining bytes are an estimate and may differ from the carrier's accounting. Expired allowance is shown as unused rather than usable data.
-
-## Build and test safely
-
-Debug builds install as **DATRACK Preview**, package `com.loadpredictor.audit`, with separate databases, preferences and widget providers. Release remains `com.loadpredictor`. Never run destructive test fixtures against the personal app.
-
-Use JDK 17 toolchains and Android SDK 36:
+## Safe build and testing
+Use JDK 17 and Android SDK 36. Instrumentation is restricted to **com.loadpredictor.releasecheck.audit** by SafeTestRunner. The actual package is **com.loadpredictor**. Existing Preview (`com.loadpredictor.audit`) may have a different historical schema and is not the verification target.
 
 ```powershell
-.\gradlew.bat testDebugUnitTest assembleDebug lintDebug --no-configuration-cache
-.\gradlew.bat assembleDebugAndroidTest --no-configuration-cache
+.\gradlew.bat testVerificationUnitTest assembleVerification assembleVerificationAndroidTest assembleRelease lintRelease --offline
 ```
 
-The preview APK is `app/build/outputs/apk/debug/app-debug.apk`. Usage Access is required for meaningful readings; a physical device with mobile data is required to assess accuracy. Notification delivery also needs Android notification permission and an enabled channel.
+APK paths: `app/build/outputs/apk/verification/app-verification.apk` and `app/build/outputs/apk/androidTest/verification/app-verification-androidTest.apk`. If Gradle's connected-test wrapper lacks offline UTP dependencies, install these two APKs and invoke:
 
-Place a DATRACK Preview widget before the real widget persistence/refresh instrumented test; otherwise that test explicitly skips. The test asserts its target has the `.audit` suffix. It saves/restores that widget's prior state. Other worker tests create preview-only fixtures and change preview alert preferences; use the preview as a test installation.
+```powershell
+adb shell am instrument -w -r com.loadpredictor.releasecheck.audit.test/com.loadpredictor.testing.SafeTestRunner
+```
 
-On the audited workstation, Gradle's connected-test wrapper lacks offline UTP dependencies. Building both APKs, installing them and invoking `com.loadpredictor.audit.test/androidx.test.runner.AndroidJUnitRunner` directly runs the same device suite.
+Place a Verification widget before the widget interaction test; otherwise that test explicitly skips. Mutating tests restore rows, active selection and preferences and clear test work/notifications. Never run them on the personal app. No destructive Room fallback or schema downgrade is used.
 
-## Validation snapshot — 20 October 2026
+Release artifacts must retain the installed package, signing certificate and an increasing versionCode. Never uninstall the personal app to apply an update. The current local installation uses its existing Android Debug certificate; public-store signing requires a separate continuity plan.
 
-- 138 JVM tests pass.
-- 12 instrumented tests pass on Samsung Galaxy A22 5G, Android 13, including actual placed-widget state persistence and refresh scheduling.
-- Preview and test APKs assemble; Android lint has no errors. Remaining warnings include dependency/icon maintenance and context-holder warnings whose factories pass application context.
-- Actual Samsung launcher placement, resizing, body tap and refresh were checked during implementation. The earlier redesigned layout passed a 200% text check; that certification does not apply to the subsequently restored original layout. Revalidate text-size coverage before release.
-- A new preview promo was created through the UI and survived a data-preserving preview update. Original app data and widget were not upgraded or deleted.
+## Measurement limits
+Mobile traffic is aggregated across the device. Initial already-used bytes are counted once. General/open-access pools are the intended allowance; zero-rated and specialized carrier buckets are not isolated. Reactivating a promo still uses its original measurement window, including inactive periods. History is queried from Android and the current view is limited to 90 days; a configuration backup does not promise permanent usage-history retention.
 
-This is a verified preview, not a complete release certification. See [implementation status](docs/implementation-status.md) for outstanding cross-device, accessibility and multi-day measurement checks. No database schema change was needed for these fixes; existing v4 rows preserve their measurement boundary and offset.
+## Roadmap status
 
-## Architecture
+| Step | Status |
+|---|---|
+| 1. Existing logic and race hardening | Implemented; targeted failures reproduced and covered |
+| 2. Local diagnostics and release verification | Implemented; multi-day/Doze/other-device evidence remains pending |
+| 3. Configuration backup and safe restore | Implemented; validation, native picker and interrupted-recovery checks |
+| 4. Carrier balance reconciliation | On hold |
+| 5. Daily budgets / expiry reminders | On hold |
+| 6. Further feature expansion | On hold |
 
-`data/` wraps Room, preferences, Android measurement and notification submission. `domain/` holds Kotlin models, forecasting and use cases. `presentation/` contains Compose screens and Glance state/layouts. `worker/` schedules and serializes background measurement/alert evaluation. Foreground polling refreshes only the selected screen; stale failures remain explicit.
-
-## Next scope
-
-Carrier balance reconciliation, daily budgets, expiry reminders, local exports and any multi-carrier expansion are separate follow-up features. True per-SIM attribution, automatic specialized-pool accounting and a community backend are outside this implementation.
+No Codex monitor, account, cloud backend or publication is created by these changes. The 72-hour/seven-day observation period is elapsed-time verification, not an automated-test completion claim. See [the 1.1.0 release record](docs/plans-1-3-release.md) for exact results and limits.
 
 ## License
-
 MIT

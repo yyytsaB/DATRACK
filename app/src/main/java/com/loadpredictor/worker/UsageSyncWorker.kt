@@ -94,6 +94,12 @@ class UsageSyncWorker(
                     // Evaluate Threshold Notifications with Anti-Re-Fire & Configurable Preferences
                     val usedRatio = forecast.dataUsedBytes.toDouble() / forecast.promo.totalAllowanceBytes.toDouble()
                     val usedPercentage = (usedRatio * 100.0).toInt()
+                    val crossed=buildSet {
+                        listOf(50,80,90).filter {usedPercentage>=it}.forEach {add(it.toString())}
+                        if(selectedPromo.expirationTimestamp!=null && forecast.estimatedDepletionTimestamp!=null &&
+                            selectedPromo.expirationTimestamp-forecast.estimatedDepletionTimestamp>=12*3600000L) add("PREMATURE_DEPLETION")
+                    }
+                    notificationPrefs.primeRestoredPromo(selectedPromo.id,crossed)
                     val notifiedThresholds = notificationPrefs.getNotifiedThresholds(selectedPromo.id).first()
                     val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()
 

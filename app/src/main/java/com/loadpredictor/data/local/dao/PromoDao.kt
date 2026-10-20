@@ -79,4 +79,8 @@ abstract class PromoDao {
         AND :at >= last_sync_timestamp""")
     abstract suspend fun updateObservedCheckpoint(id:Long,start:Long,offset:Long,allowance:Long,
         previousAt:Long,previousBytes:Long,rate:Double?,bytes:Long,at:Long):Int
+    /** Only used inside the journaled, user-confirmed restore transaction. */
+    @Query("DELETE FROM promos")
+    abstract suspend fun clearForRestore(): Int
+
 }

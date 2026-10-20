@@ -18,7 +18,10 @@ class LocalDiagnostics(context:Context, directory:File=context.noBackupFilesDir)
     private val json=Json {encodeDefaults=true}
     companion object {private val lock=Mutex();const val MAX_EVENTS=1000;const val RETENTION=7*86400000L}
     private fun read():List<ObservationEvent> = try {
-        json.decodeFromString(file.openRead().use {it.readBytes().toString(Charsets.UTF_8)})
+        file.openRead().use {stream->
+            val data=com.loadpredictor.domain.backup.BackupCodec.read(stream)
+            json.decodeFromString(data.toString(Charsets.UTF_8))
+        }
     } catch(_:java.io.FileNotFoundException){emptyList()}
     private fun write(events:List<ObservationEvent>) {
         val out=file.startWrite()

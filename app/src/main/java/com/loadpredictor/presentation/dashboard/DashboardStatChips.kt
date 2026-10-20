@@ -164,10 +164,3 @@ private fun StatChip(
         }
     }
 }
-
-private fun computeHalfSpreadDays(forecast: BurnForecast): Int? {
-    val early = forecast.depletionEarlyTimestamp ?: return null
-    val late = forecast.depletionLateTimestamp ?: return null
-    val spreadDays = kotlin.math.round((late - early) / 86_400_000.0 / 2.0).toInt()
-    return if (spreadDays > 0) spreadDays else null
-}

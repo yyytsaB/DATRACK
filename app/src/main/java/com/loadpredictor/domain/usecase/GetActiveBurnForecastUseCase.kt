@@ -34,7 +34,7 @@ class GetActiveBurnForecastUseCase(
     private val timeProvider: TimeProvider = DefaultTimeProvider(),
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) {
-    suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult =
+    suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult = try {
         com.loadpredictor.domain.sync.DataOperationGate.exclusive {
             val at=currentTime ?: timeProvider.currentTimeMillis()
             val result=evaluate(activePromo,at)
@@ -50,6 +50,9 @@ class GetActiveBurnForecastUseCase(
                     (result as? BurnForecastResult.Success)?.forecast?.dataUsedBytes?.minus(activePromo?.initialUsageOffsetBytes ?: 0)))
             result
         }
+    } catch(e:CancellationException){throw e} catch(e:Exception) {
+        BurnForecastResult.Error(e.message ?: "Reading unavailable")
+    }
 
     private suspend fun evaluate(activePromo:Promo?,currentTime:Long?):BurnForecastResult {
         if (activePromo == null) {
@@ -62,7 +65,8 @@ class GetActiveBurnForecastUseCase(
                 startTime = activePromo.startTimestamp,
                 endTime = minOf(now, activePromo.expirationTimestamp ?: now)
             )
-            if (usedBytes < activePromo.lastSyncDataUsedBytes && now >= activePromo.lastSyncTimestamp) {
+            if (!activePromo.isExpired(now) && activePromo.remainingBytes(usedBytes)>0 &&
+                usedBytes < activePromo.lastSyncDataUsedBytes && now >= activePromo.lastSyncTimestamp) {
                 promoRepository.updateObservedSyncState(activePromo,null,usedBytes,now)
                 return BurnForecastResult.Error("Android revised its usage history. Refresh to recalibrate the estimate.")
             }

@@ -12,3 +12,6 @@ Reliability update to the actual app, preserving its original appearance and sch
 Stop UI redesign work. Prioritize safe tests, correct logic, dependable updates and verified in-place upgrades. The Downloads/ui port and optional carrier/price/per-app features are excluded from this release.
 ## Safety boundary
 Only the disposable Verification package may run instrumentation. Original app data is backed up before an update. Preserve package identity and signing certificate; no uninstall or data clear.
+
+## Approved 1.1.0 additions
+Bounded private diagnostics with explicit support export, and versioned configuration backup/restore through the Android file picker. Restore requires a fresh safety export and uses durable startup recovery. These additions use a small Home action and scrollable dialog; the original visual design stays. Steps 4–6 remain on hold.

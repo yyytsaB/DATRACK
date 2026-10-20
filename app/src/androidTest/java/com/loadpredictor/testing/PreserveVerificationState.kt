@@ -22,7 +22,7 @@ class PreserveVerificationState : ExternalResource() {
         val alerts = AlertPreferencesDataSource(context)
         val flags = alerts.alertPreferencesFlow.first()
         val notifications = NotificationPreferencesDataSource(context)
-        val milestones = original.associate { it.id to notifications.getNotifiedThresholds(it.id).first() }
+        val ledger = notifications.snapshotLedger()
         restore = {
             work.cancelAllWork().result.get()
             dao.getAllPromos().first().filter { row -> original.none { it.id == row.id } }.forEach {
@@ -34,10 +34,7 @@ class PreserveVerificationState : ExternalResource() {
             alerts.set80AlertEnabled(flags.is80Enabled)
             alerts.set90AlertEnabled(flags.is90Enabled)
             alerts.setPrematureAlertEnabled(flags.isPrematureEnabled)
-            milestones.forEach { (id, values) ->
-                notifications.clearThresholdsForPromo(id)
-                values.forEach { notifications.recordThresholdNotified(id, it) }
-            }
+            notifications.replaceLedger(ledger)
             (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancelAll()
         }
     }

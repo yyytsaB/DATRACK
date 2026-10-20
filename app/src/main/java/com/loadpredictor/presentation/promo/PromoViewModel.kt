@@ -112,6 +112,7 @@ class PromoViewModel(
         _uiState.update { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
             try {
+                com.loadpredictor.domain.sync.DataOperationGate.exclusive {
                 val baselineChanged = existingPromo != null && (existingPromo.startTimestamp != startTimestamp || existingPromo.initialUsageOffsetBytes != initialUsageOffsetBytes)
                 val promo = Promo(
                     id = id,
@@ -133,6 +134,7 @@ class PromoViewModel(
                 }
                 onPromoMutated?.invoke()
                 onSuccess(savedId)
+                }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 val msg = e.localizedMessage ?: "Failed to save promo"
@@ -159,9 +161,11 @@ class PromoViewModel(
     fun deletePromo(promo: Promo) {
         viewModelScope.launch {
             try {
-                promoRepository.deletePromo(promo)
-                notificationPreferences?.clearThresholdsForPromo(promo.id)
-                onPromoMutated?.invoke()
+                com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+                    promoRepository.deletePromo(promo)
+                    notificationPreferences?.clearThresholdsForPromo(promo.id)
+                    onPromoMutated?.invoke()
+                }
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 _uiState.update { it.copy(errorMessage = "Couldn't delete the promo. Try again.") }

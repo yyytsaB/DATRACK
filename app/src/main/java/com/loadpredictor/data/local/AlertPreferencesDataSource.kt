@@ -33,27 +33,35 @@ class AlertPreferencesDataSource(private val context: Context) {
         )
     }
 
-    suspend fun set50AlertEnabled(enabled: Boolean) {
+    suspend fun set50AlertEnabled(enabled: Boolean) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
         context.alertDataStore.edit { preferences ->
             preferences[KEY_ALERT_50] = enabled
         }
     }
 
-    suspend fun set80AlertEnabled(enabled: Boolean) {
+    suspend fun set80AlertEnabled(enabled: Boolean) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
         context.alertDataStore.edit { preferences ->
             preferences[KEY_ALERT_80] = enabled
         }
     }
 
-    suspend fun set90AlertEnabled(enabled: Boolean) {
+    suspend fun set90AlertEnabled(enabled: Boolean) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
         context.alertDataStore.edit { preferences ->
             preferences[KEY_ALERT_90] = enabled
         }
     }
 
-    suspend fun setPrematureAlertEnabled(enabled: Boolean) {
+    suspend fun setPrematureAlertEnabled(enabled: Boolean) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
         context.alertDataStore.edit { preferences ->
             preferences[KEY_ALERT_PREMATURE] = enabled
         }
     }
+    suspend fun replace(flags:AlertPreferences) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+        context.alertDataStore.edit {
+            it[KEY_ALERT_50]=flags.is50Enabled;it[KEY_ALERT_80]=flags.is80Enabled
+            it[KEY_ALERT_90]=flags.is90Enabled;it[KEY_ALERT_PREMATURE]=flags.isPrematureEnabled
+        }
+        Unit
+    }
+
 }
