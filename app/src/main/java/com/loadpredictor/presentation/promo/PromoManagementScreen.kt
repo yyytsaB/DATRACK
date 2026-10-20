@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material3.Card
@@ -482,7 +484,7 @@ fun PromoItemCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             if(isActive && !promo.isExpired(System.currentTimeMillis())) {
-                androidx.compose.material3.TextButton(onClick=onCarrierCheck) { Text("Check against carrier balance") }
+                com.loadpredictor.presentation.tools.ToolActionRow("Check carrier balance",icon=Icons.Default.CompareArrows,onClick=onCarrierCheck)
                 promo.correctionAt?.let { Text("Carrier baseline · ${com.loadpredictor.util.DataFormatter.formatDate(it)}",style=MaterialTheme.typography.bodySmall,color=TextMediumEmphasis) }
             }
             // Progress Bar and Metric Row

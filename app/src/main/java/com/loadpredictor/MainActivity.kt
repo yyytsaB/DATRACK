@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
                     if(currentDestination==NavDestination.HOME) androidx.compose.material3.IconButton(
                         onClick={showDataTools=true},modifier=Modifier.align(Alignment.TopEnd)
                             .padding(top=innerPadding.calculateTopPadding()+16.dp,end=12.dp).semantics {contentDescription="Data and support"}) {
-                        Text("⋮",color=MintPrimary,fontSize=26.sp,modifier=Modifier)
+                        Icon(Icons.Default.MoreVert,contentDescription=null,tint=MintPrimary)
                     }
                     }
                 }

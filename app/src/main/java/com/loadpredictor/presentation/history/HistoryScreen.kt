@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -99,7 +101,7 @@ fun HistoryScreen(
                     .padding(horizontal = 20.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if(uiState.activePromo!=null)item {androidx.compose.material3.TextButton(onClick={showDiary=true}){Text("Data Diary and mobile app usage")}}
+                if(uiState.activePromo!=null)item {com.loadpredictor.presentation.tools.ToolActionRow("Data Diary", "Export usage or explore apps", icon=Icons.Default.BarChart,onClick={showDiary=true})}
                 uiState.errorMessage?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
                 item {
                 // 1. Context Title, Inline Stats, and Time-Range Selector

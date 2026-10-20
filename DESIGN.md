@@ -19,3 +19,6 @@ The 1.1.0 Home three-dot action opens Data and support: configuration export, re
 
 ## Approved steps 4–6 controls
 Carrier comparison/confirmation/history/undo in Promos; daily budget and expiry settings in Home/Alerts; selected-date Data Diary export and mobile app usage in History. No new navigation, colors, typeface or widget graphics. The larger-text checks use 1.3× system font scale and restore the original setting afterward.
+
+## Scoped tool polish (1.2.1)
+The user requested refinement of the new features. Operate mode: complete a configuration or inspection task with clear actions and visible state. Keep the original screen hierarchy, mint palette, type styles and widget graphics. Secondary tools use Material bottom sheets with contextual headers, a fixed primary action above the keyboard, 48 dp touch targets and scrollable content. Use existing surface tokens rather than default purple dialog tones. Carrier input and confirmation are separate views; budget/reminder controls are grouped; the Data Diary separates daily and app views with measured bars. Detailed caveats remain available in expandable help. Backup replacement still requires validation and a fresh safety export. No service, database or measurement logic changes belong to this refinement.
