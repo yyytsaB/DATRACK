@@ -34,7 +34,16 @@ class UsageSyncWorker(
     companion object { private val syncMutex = Mutex() }
 
     override suspend fun doWork(): Result = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
-        runWork()
+        val trigger=inputData.getString("trigger") ?: "unspecified"
+        suspend fun record(status:String) = com.loadpredictor.domain.diagnostics.ObservationLog.record(
+            com.loadpredictor.domain.diagnostics.ObservationEvent(System.currentTimeMillis(),"worker:$trigger",status,
+                attempt=runAttemptCount,requestedAt=inputData.getLong("requestedAt",0).takeIf {it>0}))
+        record("attempt_started")
+        try {
+            val outcome=runWork()
+            record(when(outcome){Result.success()->"completed";Result.retry()->"retry";else->"failed"})
+            outcome
+        } catch(e:kotlinx.coroutines.CancellationException) {throw e}
     }
 
     private suspend fun runWork():Result = syncMutex.withLock {

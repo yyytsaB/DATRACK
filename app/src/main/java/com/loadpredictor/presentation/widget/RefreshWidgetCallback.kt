@@ -12,6 +12,6 @@ import com.loadpredictor.worker.WorkManagerScheduler
  */
 class RefreshWidgetCallback : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        WorkManagerScheduler.enqueueImmediateSync(context)
+        WorkManagerScheduler.enqueueImmediateSync(context,"widget_refresh")
     }
 }

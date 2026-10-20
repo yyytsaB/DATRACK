@@ -35,7 +35,21 @@ class GetActiveBurnForecastUseCase(
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase? = null
 ) {
     suspend fun execute(activePromo: Promo?, currentTime: Long? = null): BurnForecastResult =
-        com.loadpredictor.domain.sync.DataOperationGate.exclusive { evaluate(activePromo,currentTime) }
+        com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+            val at=currentTime ?: timeProvider.currentTimeMillis()
+            val result=evaluate(activePromo,at)
+            val category=when(result) {
+                is BurnForecastResult.Success -> "success"
+                BurnForecastResult.PermissionRequired -> "permission_required"
+                BurnForecastResult.NoActivePromo -> "no_active_promo"
+                is BurnForecastResult.Error -> "unavailable"
+            }
+            com.loadpredictor.domain.diagnostics.ObservationLog.record(
+                com.loadpredictor.domain.diagnostics.ObservationEvent(at,"forecast",category,
+                    activePromo?.startTimestamp,activePromo?.let {minOf(at,it.expirationTimestamp ?: at)},
+                    (result as? BurnForecastResult.Success)?.forecast?.dataUsedBytes?.minus(activePromo?.initialUsageOffsetBytes ?: 0)))
+            result
+        }
 
     private suspend fun evaluate(activePromo:Promo?,currentTime:Long?):BurnForecastResult {
         if (activePromo == null) {

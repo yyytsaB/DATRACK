@@ -1,5 +1,7 @@
 package com.loadpredictor
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -141,6 +143,7 @@ class MainActivity : ComponentActivity() {
                 )
                 val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
+                var showDataTools by rememberSaveable { mutableStateOf(false) }
                 var currentDestination by rememberSaveable { mutableStateOf(NavDestination.HOME) }
 
                 // Lifecycle-aware foreground ticker: refreshes immediately on entry (and on resume from Settings)
@@ -175,6 +178,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 ) { innerPadding ->
+                    Box(Modifier.fillMaxSize()) {
                     when (currentDestination) {
                         NavDestination.HOME -> {
                             MainScreenContent(
@@ -221,14 +225,21 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    if(currentDestination==NavDestination.HOME) androidx.compose.material3.IconButton(
+                        onClick={showDataTools=true},modifier=Modifier.align(Alignment.TopEnd)
+                            .padding(top=innerPadding.calculateTopPadding()+16.dp,end=12.dp).semantics {contentDescription="Data and support"}) {
+                        Text("⋮",color=MintPrimary,fontSize=26.sp,modifier=Modifier)
+                    }
+                    }
                 }
+                if(showDataTools) com.loadpredictor.presentation.tools.DataToolsDialog {showDataTools=false}
             }
         }
     }
 
     override fun onStop() {
         super.onStop()
-        WorkManagerScheduler.enqueueImmediateSync(this)
+        WorkManagerScheduler.enqueueImmediateSync(this,"background_transition")
     }
 }
 

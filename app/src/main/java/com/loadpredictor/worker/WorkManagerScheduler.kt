@@ -23,6 +23,7 @@ object WorkManagerScheduler {
      */
     fun schedulePeriodicSync(context: Context) {
         val workRequest = PeriodicWorkRequestBuilder<UsageSyncWorker>(1, TimeUnit.HOURS)
+            .setInputData(androidx.work.workDataOf("trigger" to "periodic"))
             .setConstraints(
                 Constraints.Builder()
                     .build()
@@ -39,8 +40,9 @@ object WorkManagerScheduler {
     /**
      * Triggers an immediate one-time sync (e.g. on widget refresh or active promo update).
      */
-    fun enqueueImmediateSync(context: Context) {
+    fun enqueueImmediateSync(context: Context, trigger:String="user_or_change") {
         val workRequest = OneTimeWorkRequestBuilder<UsageSyncWorker>()
+            .setInputData(androidx.work.workDataOf("trigger" to trigger,"requestedAt" to System.currentTimeMillis()))
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
