@@ -3,12 +3,12 @@
 ## Platform
 android
 ## Users and purpose
-Philippine prepaid mobile data users who configure their promo and want to understand remaining allowance, validity and estimated depletion. Inferred audience from the existing product specification.
+Philippine prepaid mobile data users who configure their promo and want to understand remaining allowance, validity and estimated depletion.
 ## Stack
-Native Kotlin, Jetpack Compose Material 3, Room, WorkManager and Jetpack Glance.
-## Capabilities and constraints
-Manual promo setup, offsets, expiration dates, active promo selection, optional carrier/price load details, forecast, usage history, Android-attributed mobile usage by app, weekly patterns, local notifications and compact/wide home screen widgets. Usage is device-total, not per-SIM. Local data only. Preserve domain fixes and hourly background cadence.
-## Brand commitments
-DATRACK name and mint identity. User pinned the supplied Downloads/ui React design as the visual authority for Preview. Earlier stripped-down and dark mint redesigns were rejected. Original app data remains separate from Preview.
-## Evidence
-Repository skill, existing implementation and connected Samsung A22 5G. No additional marketing claims.
+Kotlin, Jetpack Compose, Room, WorkManager and Glance.
+## Current scope
+Reliability update to the actual app, preserving its original appearance and schema-4 saved data. Manual promo setup, offsets, exact expiry, active selection, forecasts, history, notifications and existing widgets remain available. Measurements cover device-total mobile data, not isolated per-SIM billing.
+## User direction
+Stop UI redesign work. Prioritize safe tests, correct logic, dependable updates and verified in-place upgrades. The Downloads/ui port and optional carrier/price/per-app features are excluded from this release.
+## Safety boundary
+Only the disposable Verification package may run instrumentation. Original app data is backed up before an update. Preserve package identity and signing certificate; no uninstall or data clear.

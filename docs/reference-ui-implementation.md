@@ -1,3 +1,5 @@
+> Superseded by the reliability-only update. The user cancelled the Preview redesign and requested the original appearance. See [reliability-release.md](reliability-release.md).
+
 # DATRACK Preview — supplied UI reference implementation
 
 ## Scope and authority

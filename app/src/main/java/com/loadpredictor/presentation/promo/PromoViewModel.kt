@@ -105,8 +105,6 @@ class PromoViewModel(
         isActive: Boolean = true,
         id: Long = 0L,
         existingPromo: Promo? = null,
-        carrier: String? = existingPromo?.carrier,
-        priceCentavos: Long? = existingPromo?.priceCentavos,
         onSuccess: (Long) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -126,9 +124,7 @@ class PromoViewModel(
                     isActive = isActive,
                     lastActiveBurnRate = if (baselineChanged) null else existingPromo?.lastActiveBurnRate,
                     lastSyncDataUsedBytes = if (baselineChanged) 0L else existingPromo?.lastSyncDataUsedBytes ?: 0L,
-                    lastSyncTimestamp = if (baselineChanged) 0L else existingPromo?.lastSyncTimestamp ?: 0L,
-                    carrier = carrier?.trim()?.takeIf { it.isNotEmpty() },
-                    priceCentavos = priceCentavos
+                    lastSyncTimestamp = if (baselineChanged) 0L else existingPromo?.lastSyncTimestamp ?: 0L
                 )
                 val savedId = savePromoUseCase(promo)
                 if (existingPromo == null || existingPromo.totalAllowanceBytes != allowanceBytes ||

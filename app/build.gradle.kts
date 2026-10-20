@@ -13,17 +13,26 @@ android {
         applicationId = "com.loadpredictor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.loadpredictor.testing.SafeTestRunner"
     }
+
+    testBuildType = "verification"
 
     buildTypes {
         debug {
             applicationIdSuffix = ".audit"
             versionNameSuffix = "-audit"
             resValue("string", "app_name", "DATRACK Preview")
+        }
+        create("verification") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".releasecheck.audit"
+            versionNameSuffix = "-verification"
+            resValue("string", "app_name", "DATRACK Verification")
+            matchingFallbacks += listOf("debug")
         }
         release {
             isMinifyEnabled = false

@@ -142,7 +142,7 @@ fun NoActivePromoScreen(
                 modifier = Modifier
                     .width(220.dp)
                     .height(50.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = mintTeal,
                     contentColor = MintOnPrimary

@@ -111,7 +111,7 @@ internal fun DailyBreakdownRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f)
+    val fraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
 
     Row(
         modifier = Modifier
@@ -122,7 +122,7 @@ internal fun DailyBreakdownRow(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         // Date (Left)
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.width(68.dp)) {
             Text(
                 text = formatDateMonthDay(bucket.startTimestamp),
                 fontSize = 13.sp,
@@ -131,7 +131,7 @@ internal fun DailyBreakdownRow(
             )
             Text(
                 text = formatDayOfWeek(bucket.startTimestamp),
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = TextLowEmphasis
             )
         }
@@ -144,7 +144,7 @@ internal fun DailyBreakdownRow(
                 .weight(1f)
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFF213034))
+                .background(Color(0xFF1E2636))
         ) {
             Box(
                 modifier = Modifier

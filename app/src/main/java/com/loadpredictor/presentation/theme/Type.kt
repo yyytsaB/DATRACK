@@ -2,20 +2,38 @@ package com.loadpredictor.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import com.loadpredictor.R
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
+import com.loadpredictor.R
 
-val OutfitFontFamily = FontFamily(
-    Font(R.font.outfit_400, FontWeight.Normal), Font(R.font.outfit_500, FontWeight.Medium),
-    Font(R.font.outfit_600, FontWeight.SemiBold), Font(R.font.outfit_700, FontWeight.Bold),
-    Font(R.font.outfit_800, FontWeight.ExtraBold)
+/**
+ * Google Font Provider for downloadable fonts via Google Play Services.
+ */
+private val GoogleFontProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
 )
-val DataFontFamily = FontFamily(Font(R.font.dm_mono))
 
-/** Native type roles stay available offline and follow Android font scaling. */
+private val OutfitFontName = GoogleFont("Outfit")
+
+/**
+ * Outfit font family supporting standard, medium, semibold, and bold weights with system fallback.
+ */
+val OutfitFontFamily = FontFamily(
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Normal),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Medium),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.SemiBold),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.Bold),
+    Font(googleFont = OutfitFontName, fontProvider = GoogleFontProvider, weight = FontWeight.ExtraBold)
+)
+
+/**
+ * App-wide Material 3 Typography utilizing the Outfit font family.
+ */
 val LoadPredictorTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = OutfitFontFamily,
@@ -85,7 +103,7 @@ val LoadPredictorTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.sp
+        letterSpacing = 0.5.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = OutfitFontFamily,
@@ -113,13 +131,13 @@ val LoadPredictorTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.sp
+        letterSpacing = 0.5.sp
     ),
     labelSmall = TextStyle(
         fontFamily = OutfitFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
+        fontSize = 11.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.sp
+        letterSpacing = 0.5.sp
     )
 )

@@ -72,7 +72,7 @@ fun InteractiveUsageChart(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
         border = BorderStroke(1.dp, BorderHighlight)
     ) {
@@ -96,14 +96,14 @@ fun InteractiveUsageChart(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = com.loadpredictor.presentation.theme.MintPrimaryContainer,
-                        border = null
+                        color = PurpleBadgeBackground,
+                        border = BorderStroke(1.dp, Color(0xFF3B2D6B))
                     ) {
                         Text(
                             text = "${formatDayLabel(selectedBucket.startTimestamp)}: ${DataFormatter.formatBytes(selectedBucket.totalBytes)}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MintPrimary,
+                            color = PurpleBadgeText,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -165,10 +165,10 @@ fun InteractiveUsageChart(
                         val displayBuckets = buckets
                         displayBuckets.forEachIndexed { index, bucket ->
                             val isSelected = (bucket.startTimestamp == (selectedBucketTimestamp ?: buckets.lastOrNull()?.startTimestamp))
-                            val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f)
+                            val targetFraction = (bucket.totalBytes.toFloat() / maxBytes.toFloat()).coerceIn(0.04f, 1f)
                             val animatedHeightFraction by animateFloatAsState(
                                 targetValue = targetFraction,
-                                animationSpec = tween(durationMillis = 200),
+                                animationSpec = tween(durationMillis = 500),
                                 label = "barHeight"
                             )
 
@@ -206,11 +206,11 @@ fun InteractiveUsageChart(
                                 Text(
                                     text = if (showLabel) formatShortDay(bucket.startTimestamp) else "",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 12.sp,
+                                    fontSize = 10.sp,
                                     color = if (isSelected) MintPrimary else TextLowEmphasis,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center,
-                                    maxLines = 2
+                                    maxLines = 1
                                 )
                             }
                         }

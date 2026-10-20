@@ -5,14 +5,6 @@ import org.junit.Test
 
 class DataFormatterTest {
 
-    @Test
-    fun `measured traffic does not round small transfers down to zero`() {
-        assertEquals("0 MB", DataFormatter.formatMeasuredBytes(0))
-        assertEquals("< 1 MB", DataFormatter.formatMeasuredBytes(1))
-        assertEquals("< 1 MB", DataFormatter.formatMeasuredBytes(1048575))
-        assertEquals("1 MB", DataFormatter.formatMeasuredBytes(1048576))
-    }
-
     private val oneGb = 1024L * 1024L * 1024L
     private val oneMb = 1024L * 1024L
 

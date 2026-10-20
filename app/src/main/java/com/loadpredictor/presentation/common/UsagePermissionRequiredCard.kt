@@ -1,8 +1,5 @@
 package com.loadpredictor.presentation.common
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,21 +52,36 @@ fun UsagePermissionRequiredCard(
     onGrantPermissionClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val coralPrimary = com.loadpredictor.presentation.theme.MintPrimary
-    val crimsonBadgeBg = com.loadpredictor.presentation.theme.MintPrimaryContainer
+    val coralPrimary = Color(0xFFFF6F6F)
+    val crimsonBadgeBg = Color(0xFF2B171C)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = DarkBackground,
         topBar = {
-            ScreenHeader("DATRACK", "Connect your usage · Preview")
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "DATRACK",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        letterSpacing = 1.sp,
+                        color = TextHighEmphasis
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkBackground,
+                    titleContentColor = TextHighEmphasis
+                )
+            )
         }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding).verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 24.dp),
+                .padding(innerPadding)
+                .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -118,18 +130,18 @@ fun UsagePermissionRequiredCard(
                 onClick = onGrantPermissionClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(52.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = coralPrimary,
-                    contentColor = com.loadpredictor.presentation.theme.MintOnPrimary
+                    contentColor = Color.White
                 )
             ) {
                 Text(
                     text = "Grant Access",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = com.loadpredictor.presentation.theme.MintOnPrimary
+                    color = Color.White
                 )
             }
 

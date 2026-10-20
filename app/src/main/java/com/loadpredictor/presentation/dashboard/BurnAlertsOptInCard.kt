@@ -85,7 +85,7 @@ fun BurnAlertsOptInCard(
     if (!isGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Card(
             modifier = modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
             border = BorderStroke(1.dp, AlertCardBorder)
         ) {

@@ -23,6 +23,9 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ThresholdNotificationFlowTest {
+    @get:org.junit.Rule
+    val preservedState = com.loadpredictor.testing.PreserveVerificationState()
+
 
     private lateinit var context: Context
     private lateinit var database: AppDatabase

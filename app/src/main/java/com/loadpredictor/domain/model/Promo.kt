@@ -35,13 +35,9 @@ data class Promo(
     val isActive: Boolean = true,
     val lastActiveBurnRate: Double? = null,
     val lastSyncDataUsedBytes: Long = 0L,
-    val lastSyncTimestamp: Long = 0L,
-    val carrier: String? = null,
-    val priceCentavos: Long? = null
+    val lastSyncTimestamp: Long = 0L
 ) {
     init {
-        require(priceCentavos == null || priceCentavos >= 0L) { "Price must not be negative" }
-        require(carrier == null || carrier.length <= 40) { "Carrier name is too long" }
         require(name.isNotBlank()) { "Promo name must not be blank" }
         require(totalAllowanceBytes > 0) { "Total allowance must be greater than 0 bytes" }
         require(initialUsageOffsetBytes >= 0) { "Initial usage offset must be non-negative" }

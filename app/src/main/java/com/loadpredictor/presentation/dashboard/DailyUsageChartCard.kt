@@ -74,7 +74,7 @@ fun DailyUsageChartCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceLayer1),
         border = BorderStroke(1.dp, BorderHighlight)
     ) {

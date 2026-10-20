@@ -34,6 +34,8 @@ class UsageSyncWorker(
     companion object { private val syncMutex = Mutex() }
 
     override suspend fun doWork(): Result = syncMutex.withLock {
+        // Bound explicit retry results as well as thrown failures. Neither path may loop forever.
+        if (runAttemptCount >= 5) return@withLock Result.failure()
         try { synchronizeUsage() }
         catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error

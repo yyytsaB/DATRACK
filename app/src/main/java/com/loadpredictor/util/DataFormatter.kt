@@ -83,10 +83,6 @@ object DataFormatter {
     /**
      * Shorthand formatter for standalone byte quantities (e.g. daily breakdown, allowance presets).
      */
-    /** Preserve the distinction between zero traffic and a small measured transfer. */
-    fun formatMeasuredBytes(bytes: Long): String =
-        if (bytes in 1 until 1024L * 1024L) "< 1 MB" else formatBytes(bytes)
-
     fun formatBytes(bytes: Long): String {
         val nonNegativeBytes = bytes.coerceAtLeast(0L)
         val gb = nonNegativeBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)

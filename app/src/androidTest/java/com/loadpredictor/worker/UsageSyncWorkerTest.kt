@@ -9,6 +9,7 @@ import com.loadpredictor.data.local.AppDatabase
 import com.loadpredictor.data.local.entity.PromoEntity
 import com.loadpredictor.domain.model.SimSlot
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -16,6 +17,9 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class UsageSyncWorkerTest {
+    @get:org.junit.Rule
+    val preservedState = com.loadpredictor.testing.PreserveVerificationState()
+
 
     private lateinit var context: Context
     private lateinit var database: AppDatabase
@@ -24,6 +28,15 @@ class UsageSyncWorkerTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         database = AppDatabase.getInstance(context)
+    }
+
+    @Test
+    fun retryBudgetStopsBeforeTouchingStoredData() = runBlocking {
+        val before = database.promoDao().getAllPromos().first()
+        val worker = TestListenableWorkerBuilder<UsageSyncWorker>(context)
+            .setRunAttemptCount(5).build()
+        assertEquals(ListenableWorker.Result.failure(), worker.doWork())
+        assertEquals(before, database.promoDao().getAllPromos().first())
     }
 
     @Test
