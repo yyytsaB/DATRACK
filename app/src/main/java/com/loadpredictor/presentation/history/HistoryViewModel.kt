@@ -13,11 +13,13 @@ import kotlinx.coroutines.flow.*
 class HistoryViewModel(
     private val getActivePromoUseCase: GetActivePromoUseCase,
     private val getDailyUsageBreakdownUseCase: GetDailyUsageBreakdownUseCase,
-    private val getUsagePatternInsightUseCase: GetUsagePatternInsightUseCase = GetUsagePatternInsightUseCase()
+    private val getUsagePatternInsightUseCase: GetUsagePatternInsightUseCase = GetUsagePatternInsightUseCase(),
+    private val appUsageDataSource: AppMobileUsageDataSource? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
     private var loadJob: Job? = null
+    private var appUsageJob: Job? = null
     init {
         getActivePromoUseCase().distinctUntilChangedBy { promo -> promo?.copy(lastActiveBurnRate = null, lastSyncDataUsedBytes = 0, lastSyncTimestamp = 0) }
             .onEach { promo ->
@@ -35,6 +37,8 @@ class HistoryViewModel(
     fun selectBucket(timestamp: Long?) { _uiState.update { it.copy(selectedBucketTimestamp = timestamp) } }
     fun refresh() {
         loadJob?.cancel()
+        appUsageJob?.cancel()
+        _uiState.update { it.copy(appUsage = null, appUsageError = null, isAppUsageLoading = false) }
         loadJob = viewModelScope.launch {
             val promo = _uiState.value.activePromo ?: getActivePromoUseCase().first()
             if (promo == null) {
@@ -50,6 +54,21 @@ class HistoryViewModel(
                     selectedBucketTimestamp = current.selectedBucketTimestamp?.takeIf { selected -> buckets.any { it.startTimestamp == selected } }
                         ?: buckets.lastOrNull()?.startTimestamp,
                     patternInsight = getUsagePatternInsightUseCase(buckets), isLoading = false, errorMessage = null) }
+                val source = appUsageDataSource
+                if (source != null && buckets.isNotEmpty()) {
+                    val start = buckets.first().startTimestamp
+                    val end = buckets.last().endTimestamp
+                    _uiState.update { it.copy(isAppUsageLoading = true) }
+                    appUsageJob = viewModelScope.launch {
+                        try {
+                            val report = source.query(start, end)
+                            _uiState.update { it.copy(appUsage = report, isAppUsageLoading = false, appUsageError = null) }
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            _uiState.update { it.copy(isAppUsageLoading = false, appUsageError = "App usage is unavailable. Check Usage Access and retry.") }
+                        }
+                    }
+                }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 _uiState.update { it.copy(errorMessage = "Usage is unavailable. Check Usage Access and try again.", isLoading = false) }
@@ -62,7 +81,7 @@ class HistoryViewModel(
                 val app = context.applicationContext
                 val promo = PromoRepositoryImpl(AppDatabase.getInstance(app).promoDao())
                 val usage = UsageRepositoryImpl(UsageAccessHelper(app), NetworkStatsDataSource(app))
-                return HistoryViewModel(GetActivePromoUseCase(promo), GetDailyUsageBreakdownUseCase(usage)) as T
+                return HistoryViewModel(GetActivePromoUseCase(promo), GetDailyUsageBreakdownUseCase(usage), appUsageDataSource = AppMobileUsageDataSource(app)) as T
             }
         }
     }

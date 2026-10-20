@@ -15,7 +15,7 @@ import com.loadpredictor.data.local.entity.PromoEntity
  */
 @Database(
     entities = [PromoEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -57,6 +57,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Optional user-entered load metadata; existing promo balances remain untouched. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE promos ADD COLUMN carrier TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE promos ADD COLUMN price_centavos INTEGER DEFAULT NULL")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -67,7 +75,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

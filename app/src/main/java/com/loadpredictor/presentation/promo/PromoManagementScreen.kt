@@ -249,7 +249,7 @@ fun PromoManagementScreen(
                     showAddDialog = false
                     promoToEdit = null
                 },
-                onSavePromo = { id, name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive, existingPromo ->
+                onSavePromo = { id, name, allowanceBytes, startTimestamp, expirationTimestamp, initialUsageOffsetBytes, simSlot, isActive, existingPromo, carrier, priceCentavos ->
                     viewModel.savePromo(
                         id = id,
                         name = name,
@@ -259,7 +259,7 @@ fun PromoManagementScreen(
                         initialUsageOffsetBytes = initialUsageOffsetBytes,
                         simSlot = simSlot,
                         isActive = isActive,
-                        existingPromo = existingPromo,
+                        existingPromo = existingPromo, carrier = carrier, priceCentavos = priceCentavos,
                         onSuccess = {
                             showAddDialog = false
                             promoToEdit = null

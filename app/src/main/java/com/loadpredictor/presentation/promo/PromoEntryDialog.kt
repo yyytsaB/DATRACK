@@ -98,11 +98,15 @@ fun PromoEntryDialog(
         initialUsageOffsetBytes: Long,
         simSlot: SimSlot,
         isActive: Boolean,
-        existingPromo: com.loadpredictor.domain.model.Promo?
+        existingPromo: com.loadpredictor.domain.model.Promo?,
+        carrier: String?,
+        priceCentavos: Long?
     ) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var exactExpiry by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Long?>(promoToEdit?.expirationTimestamp) }
+    var carrier by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(promoToEdit?.carrier.orEmpty()) }
+    var price by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(promoToEdit?.priceCentavos?.let { java.math.BigDecimal(it).movePointLeft(2).toPlainString() }.orEmpty()) }
     val isEditMode = promoToEdit != null
     val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -459,10 +463,21 @@ fun PromoEntryDialog(
                 )
             }
 
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Load details (optional)", color = TextMediumEmphasis, fontSize = 12.sp)
+                StyledInputFieldBox(carrier, { carrier = it.take(40) }, "Carrier, e.g. Smart")
+                StyledInputFieldBox(price, { price = it }, "Price paid in pesos", keyboardType = KeyboardType.Decimal)
+            }
+
             // Section 6: Save Promo Action Button
             Button(
                 enabled = !isSaving,
                 onClick = {
+                    val priceCentavos = com.loadpredictor.domain.model.parseLoadPrice(price)
+                    if (price.isNotBlank() && priceCentavos == null) {
+                        validationError = "Enter a valid peso amount with at most two decimal places."
+                        return@Button
+                    }
                     val finalPromoName = promoName.ifBlank { selectedPresetTitle ?: "My Promo" }
                     val numAllowance = allowanceValueStr.toDoubleOrNull()
                     if (numAllowance == null || !numAllowance.isFinite() || numAllowance <= 0.0 || numAllowance > Long.MAX_VALUE.toDouble() / selectedUnit.multiplier) {
@@ -511,7 +526,7 @@ fun PromoEntryDialog(
                             usedBytes,
                             selectedSimSlot,
                             setAsActive,
-                            promoToEdit
+                            promoToEdit, carrier.trim().takeIf { it.isNotEmpty() }, priceCentavos
                         )
                     } else {
                         val now = System.currentTimeMillis()
@@ -536,7 +551,7 @@ fun PromoEntryDialog(
                             usedBytes,
                             selectedSimSlot,
                             setAsActive,
-                            null
+                            null, carrier.trim().takeIf { it.isNotEmpty() }, priceCentavos
                         )
                     }
                 },

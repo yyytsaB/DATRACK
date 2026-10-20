@@ -23,7 +23,10 @@ data class HistoryUiState(
     val selectedBucketTimestamp: Long? = null,
     val patternInsight: UsagePatternInsight = UsagePatternInsight.InsufficientData,
     val errorMessage: String? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val appUsage: com.loadpredictor.domain.model.AppUsageReport? = null,
+    val appUsageError: String? = null,
+    val isAppUsageLoading: Boolean = false
 ) {
     /**
      * Total data volume consumed across all buckets in the selected range.

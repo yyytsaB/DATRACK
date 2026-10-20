@@ -85,7 +85,7 @@ class PromoMigrationTest {
             context,
             AppDatabase::class.java,
             dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
 
@@ -98,6 +98,8 @@ class PromoMigrationTest {
         val magicData = allPromos.find { it.id == 1L }
         assertNotNull("Magic Data promo must survive migration", magicData)
         assertEquals("Smart Magic Data 399", magicData!!.name)
+        assertNull(magicData.carrier)
+        assertNull(magicData.priceCentavos)
         assertEquals(25769803776L, magicData.totalAllowanceBytes)
         assertNull("Null expiration must remain null", magicData.expirationTimestamp)
         assertEquals(SimSlot.SIM_1, magicData.simSlot)
@@ -183,7 +185,7 @@ class PromoMigrationTest {
             context,
             AppDatabase::class.java,
             dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
 
@@ -196,6 +198,8 @@ class PromoMigrationTest {
         val magicData = allPromos.find { it.id == 1L }
         assertNotNull("Magic Data promo must survive full migration chain", magicData)
         assertEquals("Smart Magic Data 399", magicData!!.name)
+        assertNull(magicData.carrier)
+        assertNull(magicData.priceCentavos)
         assertEquals(25769803776L, magicData.totalAllowanceBytes)
         assertNull(magicData.expirationTimestamp)
         assertEquals(0L, magicData.initialUsageOffsetBytes)
@@ -273,7 +277,7 @@ class PromoMigrationTest {
             context,
             AppDatabase::class.java,
             dbName
-        ).addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+        ).addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
 
@@ -338,7 +342,7 @@ class PromoMigrationTest {
             context,
             AppDatabase::class.java,
             dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
 

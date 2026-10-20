@@ -46,7 +46,13 @@ data class PromoEntity(
     val lastSyncDataUsedBytes: Long = 0L,
 
     @ColumnInfo(name = "last_sync_timestamp", defaultValue = "0")
-    val lastSyncTimestamp: Long = 0L
+    val lastSyncTimestamp: Long = 0L,
+
+    @ColumnInfo(name = "carrier", defaultValue = "NULL")
+    val carrier: String? = null,
+
+    @ColumnInfo(name = "price_centavos", defaultValue = "NULL")
+    val priceCentavos: Long? = null
 ) {
     fun toDomain(): Promo {
         return Promo(
@@ -60,7 +66,9 @@ data class PromoEntity(
             isActive = isActive,
             lastActiveBurnRate = lastActiveBurnRate,
             lastSyncDataUsedBytes = lastSyncDataUsedBytes,
-            lastSyncTimestamp = lastSyncTimestamp
+            lastSyncTimestamp = lastSyncTimestamp,
+            carrier = carrier,
+            priceCentavos = priceCentavos
         )
     }
 }
@@ -80,6 +88,8 @@ fun Promo.toEntity(): PromoEntity {
         isActive = isActive,
         lastActiveBurnRate = lastActiveBurnRate,
         lastSyncDataUsedBytes = lastSyncDataUsedBytes,
-        lastSyncTimestamp = lastSyncTimestamp
+        lastSyncTimestamp = lastSyncTimestamp,
+            carrier = carrier,
+            priceCentavos = priceCentavos
     )
 }
