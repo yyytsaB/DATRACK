@@ -202,6 +202,7 @@ class PromoViewModel(
                         getActiveBurnForecastUseCase = getActiveBurnForecastUseCase,
                         notificationPreferences = notificationPrefs,
                         onPromoMutated = {
+                            (appContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(2102)
                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                 try {
                                     com.loadpredictor.presentation.widget.WidgetSyncHelper.syncWidgetState(

@@ -35,4 +35,14 @@ class AdvisoryServiceTest {
         try {val restore=BackupService(context,directory=folder);restore.restore(backup,restore.export());assertEquals(settings,prefs.snapshot().settings)}
         finally{folder.deleteRecursively()}
     }
+    @Test fun removedOrExpiredPromoCancelsAnAlreadyShownReminder()=runBlocking {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val prefs=AdvisoryPreferences(context);prefs.replace(AdvisoryState(AdvisorySettings(expiryHours=6)))
+        val helper=com.loadpredictor.data.notification.NotificationHelper(context)
+        val manager=context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        assertTrue(helper.showAdvisory(AdvisoryEvent("fixture","Fixture","Expiry reminder fixture",2102)))
+        val service=AdvisoryService(context);service.evaluate(null,System.currentTimeMillis())
+        kotlinx.coroutines.withTimeout(3000){while(manager.activeNotifications.any {it.id==2102})kotlinx.coroutines.delay(20)}
+        assertFalse(manager.activeNotifications.any {it.id==2102})
+    }
 }

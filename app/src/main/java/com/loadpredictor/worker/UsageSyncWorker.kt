@@ -75,7 +75,7 @@ class UsageSyncWorker(
             else useCase.execute(activePromo,now)
         val widgetState = WidgetSyncHelper.fromForecastResult(result,now)
         WidgetStatePreferences.saveStateAndNotify(context,widgetState)
-        if(usageRepo.hasUsageAccess())try {
+        try {
             com.loadpredictor.data.backup.AdvisoryService(context).evaluate(activePromo,now)
         }catch(e:kotlinx.coroutines.CancellationException){throw e}catch(_:Exception){
             com.loadpredictor.domain.diagnostics.ObservationLog.record(com.loadpredictor.domain.diagnostics.ObservationEvent(now,"advisory","unavailable"))

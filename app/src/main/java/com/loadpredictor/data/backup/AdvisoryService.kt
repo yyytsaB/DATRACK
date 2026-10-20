@@ -33,6 +33,8 @@ class AdvisoryService(private val context:Context,
     }
     suspend fun evaluate(promo:Promo?,now:Long)=DataOperationGate.exclusive {
         val state=prefs.snapshot();val settings=state.settings
+        val expiryEligible=AdvisoryPolicy.eligible(settings,promo,0,now,ZoneId.systemDefault()).any {it.notificationId==2102}
+        if(!expiryEligible)(context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(2102)
         if(!settings.dailyNotify && settings.expiryHours==null)return@exclusive
         val bytes=if(settings.dailyNotify)today(now) else 0
         val helper=NotificationHelper(context)
