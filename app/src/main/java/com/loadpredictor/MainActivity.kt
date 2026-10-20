@@ -151,6 +151,7 @@ class MainActivity : ComponentActivity() {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 LaunchedEffect(lifecycleOwner, currentDestination) {
                     lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        WorkManagerScheduler.enqueueImmediateSync(context,"foreground_entry")
                         while (isActive) {
                             when (currentDestination) {
                                 NavDestination.HOME -> mainViewModel.refresh()
@@ -336,6 +337,7 @@ fun DashboardView(
                         }
                     )
 
+                    com.loadpredictor.presentation.tools.AdvisoryControls(forecastResult.forecast.promo)
                     // Daily Usage Breakdown Teaser Strip
                     DailyUsageTeaserCard(
                         buckets = uiState.dailyUsageBreakdown,

@@ -24,6 +24,7 @@ class PreserveVerificationState : ExternalResource() {
         val flags = alerts.alertPreferencesFlow.first()
         val notifications = NotificationPreferencesDataSource(context)
         val ledger = notifications.snapshotLedger()
+        val advisory=AdvisoryPreferences(context).snapshot()
         restore = {
             work.cancelAllWork().result.get()
             dao.getAllPromos().first().filter { row -> original.none { it.id == row.id } }.forEach {
@@ -37,6 +38,7 @@ class PreserveVerificationState : ExternalResource() {
             alerts.set90AlertEnabled(flags.is90Enabled)
             alerts.setPrematureAlertEnabled(flags.isPrematureEnabled)
             notifications.replaceLedger(ledger)
+            AdvisoryPreferences(context).replace(advisory)
             (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancelAll()
         }
     }

@@ -54,6 +54,15 @@ class NotificationHelper(private val context: Context) {
             manager.getNotificationChannel(CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
     }
 
+    fun showAdvisory(event:com.loadpredictor.domain.model.AdvisoryEvent):Boolean {
+        if(!canPostNotifications())return false
+        val pending=PendingIntent.getActivity(context,event.notificationId,Intent(context,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val note=NotificationCompat.Builder(context,CHANNEL_ID).setSmallIcon(android.R.drawable.stat_notify_more)
+            .setContentTitle(event.title).setContentText(event.message).setStyle(NotificationCompat.BigTextStyle().bigText(event.message))
+            .setContentIntent(pending).setAutoCancel(true).build()
+        return try {NotificationManagerCompat.from(context).notify(event.notificationId,note);true}catch(_:SecurityException){false}
+    }
+
     /**
      * Posts an alert when data usage crosses 50%, 80%, or 90% of total allocation.
      */

@@ -38,6 +38,7 @@ class BackupService(context:Context,
         }
         return BackupDocument(createdAt=System.currentTimeMillis(),promos=rows,
             alerts=BackupAlerts(flags.is50Enabled,flags.is80Enabled,flags.is90Enabled,flags.isPrematureEnabled),
+            advisory=com.loadpredictor.data.local.AdvisoryPreferences(app).snapshot().settings,
             corrections=db.promoDao().allCorrections().map {BackupCorrection(it.id,it.promoId,it.remaining,it.measured,it.observedAt,it.createdAt,it.undone)})
     }
     suspend fun export():BackupDocument=withContext(Dispatchers.IO) {DataOperationGate.exclusive {snapshot()}}
@@ -50,6 +51,7 @@ class BackupService(context:Context,
         }
         if(injectFailure)afterDatabase()
         alerts.replace(AlertPreferences(doc.alerts.at50,doc.alerts.at80,doc.alerts.at90,doc.alerts.premature))
+        com.loadpredictor.data.backup.AdvisoryService(app).restored(doc.advisory)
         notifications.replaceLedger(NotificationLedger(doc.promos.associate {it.id to it.notified},
             doc.promos.map {it.id}.toSet()))
         (app.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancelAll()

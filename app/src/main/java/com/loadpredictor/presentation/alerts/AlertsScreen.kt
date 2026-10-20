@@ -115,6 +115,7 @@ fun AlertsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            com.loadpredictor.presentation.tools.AdvisoryControls()
             // Permission Recovery Banner (shown if POST_NOTIFICATIONS is not granted)
             if (!uiState.hasNotificationPermission) {
                 BurnAlertsOptInCard(

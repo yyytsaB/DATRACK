@@ -19,8 +19,9 @@ import java.nio.charset.CodingErrorAction
 }
 @Serializable data class BackupCorrection(val id:Long,val promoId:Long,val remaining:Long,val measured:Long,val observedAt:Long,val createdAt:Long,val undone:Boolean=false)
 @Serializable data class BackupDocument(val kind:String="datrack.configuration",val formatVersion:Int=2,
-    val createdAt:Long,val promos:List<BackupPromo>,val alerts:BackupAlerts=BackupAlerts(),val corrections:List<BackupCorrection> = emptyList()) {
+    val createdAt:Long,val promos:List<BackupPromo>,val alerts:BackupAlerts=BackupAlerts(),val corrections:List<BackupCorrection> = emptyList(),val advisory:com.loadpredictor.domain.model.AdvisorySettings=com.loadpredictor.domain.model.AdvisorySettings()) {
     fun validate(now:Long) {
+        advisory.validate()
         require(kind=="datrack.configuration" && formatVersion in 1..2) {"Unsupported backup format or version"}
         require(createdAt>=0 && promos.size<=1000) {"Invalid backup size or date"}
         require(promos.map {it.id}.toSet().size==promos.size && promos.count {it.active}<=1) {"Duplicate IDs or multiple active promos"}
