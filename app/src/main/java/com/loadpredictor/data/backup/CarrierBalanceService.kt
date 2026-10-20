@@ -35,6 +35,7 @@ class CarrierBalanceService(context:Context,
             val current=requireNotNull(dao.findById(p.id)).toDomain()
             require(current.copy(lastActiveBurnRate=p.lastActiveBurnRate,lastSyncDataUsedBytes=p.lastSyncDataUsedBytes,lastSyncTimestamp=p.lastSyncTimestamp)==p){"Promo changed. Compare again."}
             val row=BalanceCorrectionEntity(promoId=p.id,remaining=comparison.reported,measured=comparison.measured,observedAt=comparison.observedAt,createdAt=now)
+            require(p.correctionRevision<Long.MAX_VALUE && dao.allCorrections().size<10000){"Correction history is full. Export a backup before starting a new promo."}
             dao.insertCorrection(row)
             dao.updatePromo(requireNotNull(dao.findById(p.id)).copy(correctionRemaining=row.remaining,correctionMeasured=row.measured,correctionAt=row.observedAt,correctionRevision=p.correctionRevision+1))
         }
@@ -43,6 +44,7 @@ class CarrierBalanceService(context:Context,
     suspend fun undo(id:Long,expectedRevision:Long)=withContext(Dispatchers.IO) {DataOperationGate.exclusive {
         db.withTransaction {
             val p=requireNotNull(dao.findById(id))
+            require(p.correctionRevision<Long.MAX_VALUE){"Correction revision limit reached"}
             require(p.correctionRevision==expectedRevision){"Correction changed. Reopen before undoing."}
             val latest=dao.corrections(id).firstOrNull {!it.undone} ?: error("No correction to undo")
             dao.markCorrectionUndone(latest.id)

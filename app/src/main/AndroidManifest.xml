@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <queries>
+        <!-- Resolve names of launchable apps for user-requested UID attribution; no QUERY_ALL_PACKAGES. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent><action android:name="android.settings.USAGE_ACCESS_SETTINGS" /></intent>
     </queries>
 

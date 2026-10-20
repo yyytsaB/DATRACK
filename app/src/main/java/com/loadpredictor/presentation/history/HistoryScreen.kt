@@ -28,6 +28,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +60,8 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDiary by androidx.compose.runtime.remember {androidx.compose.runtime.mutableStateOf(false)}
+    if(showDiary)uiState.activePromo?.let {promo->com.loadpredictor.presentation.tools.DiaryDialog(promo,onDismiss={showDiary=false})}
 
     Scaffold(
         containerColor = DarkBackground,
@@ -96,6 +99,7 @@ fun HistoryScreen(
                     .padding(horizontal = 20.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if(uiState.activePromo!=null)item {androidx.compose.material3.TextButton(onClick={showDiary=true}){Text("Data Diary and mobile app usage")}}
                 uiState.errorMessage?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
                 item {
                 // 1. Context Title, Inline Stats, and Time-Range Selector

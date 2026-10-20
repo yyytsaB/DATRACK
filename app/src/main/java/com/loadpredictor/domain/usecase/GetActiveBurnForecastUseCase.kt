@@ -65,6 +65,9 @@ class GetActiveBurnForecastUseCase(
                 startTime = activePromo.startTimestamp,
                 endTime = minOf(now, activePromo.expirationTimestamp ?: now)
             )
+            com.loadpredictor.domain.diagnostics.ObservationLog.record(
+                com.loadpredictor.domain.diagnostics.ObservationEvent(now,"measurement","observed",activePromo.startTimestamp,
+                    minOf(now,activePromo.expirationTimestamp ?: now),usedBytes))
             if(!activePromo.isExpired(now) && activePromo.correctionMeasured!=null && usedBytes<activePromo.correctionMeasured)
                 return BurnForecastResult.Error("Android revised usage before the carrier checkpoint. Check against a fresh carrier balance.")
             if (!activePromo.isExpired(now) && activePromo.remainingBytes(usedBytes)>0 &&

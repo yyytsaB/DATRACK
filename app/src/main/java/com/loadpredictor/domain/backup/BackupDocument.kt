@@ -40,7 +40,7 @@ import java.nio.charset.CodingErrorAction
             require(it.notified.all {key->key in setOf("50","80","90","PREMATURE_DEPLETION")}) {"Invalid notification milestone"}
         }
     }
-    fun sameConfiguration(other:BackupDocument)=copy(createdAt=0)==other.copy(createdAt=0)
+    fun sameConfiguration(other:BackupDocument)=copy(createdAt=0,formatVersion=2)==other.copy(createdAt=0,formatVersion=2)
 }
 object BackupCodec {
     const val MAX_BYTES=1048576

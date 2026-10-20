@@ -201,6 +201,9 @@ fun PromoEntryDialog(
                 color = TextHighEmphasis
             )
 
+            if(promoToEdit?.correctionAt!=null)Text(
+                "Changing tracking start or already-used bytes clears the carrier baseline. Its history remains marked undone. Renaming keeps the baseline.",
+                color=TextMediumEmphasis,style=androidx.compose.material3.MaterialTheme.typography.bodySmall)
             // Section 1: Quick Presets
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
