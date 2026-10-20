@@ -14,8 +14,8 @@ import com.loadpredictor.data.local.entity.PromoEntity
  * Room database instance for local data persistence.
  */
 @Database(
-    entities = [PromoEntity::class],
-    version = 4,
+    entities = [PromoEntity::class, com.loadpredictor.data.local.entity.BalanceCorrectionEntity::class],
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -57,6 +57,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Schema 5 belonged to an abandoned Preview lineage. Actual schema 4 upgrades directly to 6.
+        val MIGRATION_4_6 = object : Migration(4,6) {
+            override fun migrate(db:SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE promos ADD COLUMN correction_remaining INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE promos ADD COLUMN correction_measured INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE promos ADD COLUMN correction_at INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE promos ADD COLUMN correction_revision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE TABLE IF NOT EXISTS balance_corrections (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, promoId INTEGER NOT NULL, remaining INTEGER NOT NULL, measured INTEGER NOT NULL, observedAt INTEGER NOT NULL, createdAt INTEGER NOT NULL, undone INTEGER NOT NULL, FOREIGN KEY(promoId) REFERENCES promos(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_balance_corrections_promoId ON balance_corrections(promoId)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -67,7 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_6)
                     .build()
                 INSTANCE = instance
                 instance

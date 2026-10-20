@@ -63,10 +63,16 @@ abstract class PromoDao {
         val old = if (input.id == 0L) null else requireNotNull(findById(input.id)) { "Promo no longer exists" }
         val changed = old != null && (old.startTimestamp != input.startTimestamp || old.initialUsageOffsetBytes != input.initialUsageOffsetBytes)
         val current = input.copy(
+            correctionRemaining=if(changed) null else old?.correctionRemaining,
+            correctionMeasured=if(changed) null else old?.correctionMeasured,
+            correctionAt=if(changed) null else old?.correctionAt,
+            correctionRevision=old?.correctionRevision ?: 0,
             isActive = false,
             lastActiveBurnRate = if (changed || old == null) null else old.lastActiveBurnRate,
             lastSyncDataUsedBytes = if (changed || old == null) 0 else old.lastSyncDataUsedBytes,
             lastSyncTimestamp = if (changed || old == null) 0 else old.lastSyncTimestamp)
+        current.toDomain() // Reject allowance edits incompatible with an accepted carrier anchor.
+        if(changed && old!=null) markAllCorrectionsUndone(old.id)
         val id = if (old == null) insertPromo(current) else { check(updatePromo(current) == 1); input.id }
         if (input.isActive) setActivePromo(id)
         return id
@@ -79,6 +85,16 @@ abstract class PromoDao {
         AND :at >= last_sync_timestamp""")
     abstract suspend fun updateObservedCheckpoint(id:Long,start:Long,offset:Long,allowance:Long,
         previousAt:Long,previousBytes:Long,rate:Double?,bytes:Long,at:Long):Int
+    @Query("SELECT * FROM balance_corrections WHERE promoId=:id ORDER BY id DESC")
+    abstract suspend fun corrections(id:Long):List<com.loadpredictor.data.local.entity.BalanceCorrectionEntity>
+    @Query("SELECT * FROM balance_corrections ORDER BY id")
+    abstract suspend fun allCorrections():List<com.loadpredictor.data.local.entity.BalanceCorrectionEntity>
+    @Insert(onConflict=OnConflictStrategy.ABORT)
+    abstract suspend fun insertCorrection(row:com.loadpredictor.data.local.entity.BalanceCorrectionEntity):Long
+    @Query("UPDATE balance_corrections SET undone=1 WHERE id=:id")
+    abstract suspend fun markCorrectionUndone(id:Long)
+    @Query("UPDATE balance_corrections SET undone=1 WHERE promoId=:id")
+    abstract suspend fun markAllCorrectionsUndone(id:Long)
     /** Only used inside the journaled, user-confirmed restore transaction. */
     @Query("DELETE FROM promos")
     abstract suspend fun clearForRestore(): Int

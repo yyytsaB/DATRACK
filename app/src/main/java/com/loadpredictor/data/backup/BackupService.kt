@@ -33,10 +33,12 @@ class BackupService(context:Context,
         val flags=alerts.alertPreferencesFlow.first();val ledger=notifications.snapshotLedger()
         val rows=db.promoDao().getAllPromos().first().map {
             BackupPromo(it.id,it.name,it.totalAllowanceBytes,it.startTimestamp,it.expirationTimestamp,
-                it.initialUsageOffsetBytes,it.simSlot.name,it.isActive,ledger.milestones[it.id].orEmpty())
+                it.initialUsageOffsetBytes,it.simSlot.name,it.isActive,ledger.milestones[it.id].orEmpty(),
+                it.correctionRemaining,it.correctionMeasured,it.correctionAt,it.correctionRevision)
         }
         return BackupDocument(createdAt=System.currentTimeMillis(),promos=rows,
-            alerts=BackupAlerts(flags.is50Enabled,flags.is80Enabled,flags.is90Enabled,flags.isPrematureEnabled))
+            alerts=BackupAlerts(flags.is50Enabled,flags.is80Enabled,flags.is90Enabled,flags.isPrematureEnabled),
+            corrections=db.promoDao().allCorrections().map {BackupCorrection(it.id,it.promoId,it.remaining,it.measured,it.observedAt,it.createdAt,it.undone)})
     }
     suspend fun export():BackupDocument=withContext(Dispatchers.IO) {DataOperationGate.exclusive {snapshot()}}
     private suspend fun apply(doc:BackupDocument,injectFailure:Boolean=false) {
@@ -44,6 +46,7 @@ class BackupService(context:Context,
         db.withTransaction {
             db.promoDao().clearForRestore()
             doc.promos.forEach {db.promoDao().insertPromo(it.toPromo().toEntity())}
+            doc.corrections.forEach {db.promoDao().insertCorrection(com.loadpredictor.data.local.entity.BalanceCorrectionEntity(it.id,it.promoId,it.remaining,it.measured,it.observedAt,it.createdAt,it.undone))}
         }
         if(injectFailure)afterDatabase()
         alerts.replace(AlertPreferences(doc.alerts.at50,doc.alerts.at80,doc.alerts.at90,doc.alerts.premature))

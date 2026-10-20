@@ -90,6 +90,8 @@ fun PromoManagementScreen(
     onNavigateBack: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var carrierPromo by remember { mutableStateOf<Promo?>(null) }
+    val context=androidx.compose.ui.platform.LocalContext.current
     var pendingDelete by remember { mutableStateOf<Promo?>(null) }
     var showAddDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var promoToEdit by remember { mutableStateOf<Promo?>(null) }
@@ -287,12 +289,16 @@ fun PromoManagementScreen(
                         activeForecast = if (isActive) uiState.activeForecast else null,
                         onSelectActive = { viewModel.selectActivePromo(promo.id) },
                         onEdit = { promoToEdit = promo },
-                        onDelete = { pendingDelete = promo }
+                        onDelete = { pendingDelete = promo },
+                        onCarrierCheck = { carrierPromo=promo }
                     )
                 }
             }
         }
 
+        carrierPromo?.let {promo->com.loadpredictor.presentation.tools.CarrierBalanceDialog(promo,onChanged={
+            com.loadpredictor.worker.WorkManagerScheduler.enqueueImmediateSync(context,"carrier_correction")
+        },onDismiss={carrierPromo=null})}
         pendingDelete?.let { promo ->
             androidx.compose.material3.AlertDialog(onDismissRequest = { pendingDelete = null },
                 title = { Text("Delete ${promo.name}?") },
@@ -338,7 +344,8 @@ fun PromoItemCard(
     activeForecast: com.loadpredictor.domain.model.BurnForecast? = null,
     onSelectActive: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onCarrierCheck: () -> Unit = {}
 ) {
     val dateSubtitle = if (promo.isExpired(System.currentTimeMillis())) "Expired • allowance no longer available" else formatPromoDateRange(promo)
     val totalBytes = promo.totalAllowanceBytes
@@ -474,6 +481,10 @@ fun PromoItemCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            if(isActive && !promo.isExpired(System.currentTimeMillis())) {
+                androidx.compose.material3.TextButton(onClick=onCarrierCheck) { Text("Check against carrier balance") }
+                promo.correctionAt?.let { Text("Carrier baseline · ${com.loadpredictor.util.DataFormatter.formatDate(it)}",style=MaterialTheme.typography.bodySmall,color=TextMediumEmphasis) }
+            }
             // Progress Bar and Metric Row
             Row(
                 modifier = Modifier.fillMaxWidth(),

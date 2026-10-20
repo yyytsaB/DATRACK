@@ -19,6 +19,7 @@ class PreserveVerificationState : ExternalResource() {
         work.cancelAllWork().result.get()
         val dao = AppDatabase.getInstance(context).promoDao()
         val original = dao.getAllPromos().first()
+        val corrections=dao.allCorrections()
         val alerts = AlertPreferencesDataSource(context)
         val flags = alerts.alertPreferencesFlow.first()
         val notifications = NotificationPreferencesDataSource(context)
@@ -30,6 +31,7 @@ class PreserveVerificationState : ExternalResource() {
                 dao.deletePromo(it)
             }
             original.forEach { dao.insertPromo(it) }
+            corrections.forEach {dao.insertCorrection(it)}
             alerts.set50AlertEnabled(flags.is50Enabled)
             alerts.set80AlertEnabled(flags.is80Enabled)
             alerts.set90AlertEnabled(flags.is90Enabled)

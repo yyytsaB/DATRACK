@@ -99,6 +99,7 @@ class UsageSyncWorker(
                         if(selectedPromo.expirationTimestamp!=null && forecast.estimatedDepletionTimestamp!=null &&
                             selectedPromo.expirationTimestamp-forecast.estimatedDepletionTimestamp>=12*3600000L) add("PREMATURE_DEPLETION")
                     }
+                    notificationPrefs.primeCorrection(selectedPromo.id,selectedPromo.correctionRevision,crossed)
                     notificationPrefs.primeRestoredPromo(selectedPromo.id,crossed)
                     val notifiedThresholds = notificationPrefs.getNotifiedThresholds(selectedPromo.id).first()
                     val alertPrefs = alertPrefsSource.alertPreferencesFlow.first()

@@ -35,9 +35,18 @@ data class Promo(
     val isActive: Boolean = true,
     val lastActiveBurnRate: Double? = null,
     val lastSyncDataUsedBytes: Long = 0L,
-    val lastSyncTimestamp: Long = 0L
+    val lastSyncTimestamp: Long = 0L,
+    val correctionRemaining: Long? = null,
+    val correctionMeasured: Long? = null,
+    val correctionAt: Long? = null,
+    val correctionRevision: Long = 0L
 ) {
     init {
+        require(listOf(correctionRemaining,correctionMeasured,correctionAt).count {it!=null} in listOf(0,3))
+        correctionRemaining?.let {require(it in 0..totalAllowanceBytes)}
+        correctionMeasured?.let {require(it>=0)}
+        correctionAt?.let {require(it>=startTimestamp)}
+        require(correctionRevision>=0)
         require(name.isNotBlank()) { "Promo name must not be blank" }
         require(totalAllowanceBytes > 0) { "Total allowance must be greater than 0 bytes" }
         require(initialUsageOffsetBytes >= 0) { "Initial usage offset must be non-negative" }
@@ -55,9 +64,14 @@ data class Promo(
      * Total validity window of the promo in milliseconds, or null for non-expiring promos.
      */
     /** Offset and live observation share the same accounting on every surface. */
-    fun remainingBytes(measuredBytes: Long): Long =
-        (totalAllowanceBytes - initialUsageOffsetBytes - measuredBytes.coerceAtLeast(0L)
+    fun remainingBytes(measuredBytes: Long): Long {
+        if(correctionRemaining!=null && correctionMeasured!=null) {
+            // A carrier anchor changes balance only, never traffic history or velocity training.
+            return (correctionRemaining-(measuredBytes.coerceAtLeast(0)-correctionMeasured).coerceAtLeast(0)).coerceAtLeast(0)
+        }
+        return (totalAllowanceBytes - initialUsageOffsetBytes - measuredBytes.coerceAtLeast(0L)
             .coerceAtMost(totalAllowanceBytes - initialUsageOffsetBytes)).coerceAtLeast(0L)
+    }
 
     val totalDurationMillis: Long?
         get() = expirationTimestamp?.let { it - startTimestamp }

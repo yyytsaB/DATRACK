@@ -47,7 +47,7 @@ class GetActiveBurnForecastUseCase(
             com.loadpredictor.domain.diagnostics.ObservationLog.record(
                 com.loadpredictor.domain.diagnostics.ObservationEvent(at,"forecast",category,
                     activePromo?.startTimestamp,activePromo?.let {minOf(at,it.expirationTimestamp ?: at)},
-                    (result as? BurnForecastResult.Success)?.forecast?.dataUsedBytes?.minus(activePromo?.initialUsageOffsetBytes ?: 0)))
+                    null))
             result
         }
     } catch(e:CancellationException){throw e} catch(e:Exception) {
@@ -65,6 +65,8 @@ class GetActiveBurnForecastUseCase(
                 startTime = activePromo.startTimestamp,
                 endTime = minOf(now, activePromo.expirationTimestamp ?: now)
             )
+            if(!activePromo.isExpired(now) && activePromo.correctionMeasured!=null && usedBytes<activePromo.correctionMeasured)
+                return BurnForecastResult.Error("Android revised usage before the carrier checkpoint. Check against a fresh carrier balance.")
             if (!activePromo.isExpired(now) && activePromo.remainingBytes(usedBytes)>0 &&
                 usedBytes < activePromo.lastSyncDataUsedBytes && now >= activePromo.lastSyncTimestamp) {
                 promoRepository.updateObservedSyncState(activePromo,null,usedBytes,now)

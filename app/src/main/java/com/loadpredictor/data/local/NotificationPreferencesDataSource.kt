@@ -16,7 +16,7 @@ private val Context.notificationDataStore: DataStore<Preferences> by preferences
  * DataStore Preferences data source managing anti-re-fire tracking for promo threshold notifications.
  * Stores sets of notified milestones (e.g. "50", "80", "90", "PREMATURE_DEPLETION") keyed by promoId.
  */
-data class NotificationLedger(val milestones:Map<Long,Set<String>>,val pendingRestore:Set<Long> = emptySet())
+data class NotificationLedger(val milestones:Map<Long,Set<String>>,val pendingRestore:Set<Long> = emptySet(),val correctionRevisions:Map<Long,Long> = emptyMap())
 
 class NotificationPreferencesDataSource(private val context: Context) {
 
@@ -41,6 +41,15 @@ class NotificationPreferencesDataSource(private val context: Context) {
             preferences.remove(key)
         }
     }
+    suspend fun primeCorrection(id:Long,revision:Long,crossed:Set<String>) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
+        context.notificationDataStore.edit {p->
+            val revisionKey=androidx.datastore.preferences.core.longPreferencesKey("correction_revision_$id")
+            if(revision>(p[revisionKey] ?: 0)) {
+                p[stringSetPreferencesKey("notified_thresholds_$id")]=crossed
+                p[revisionKey]=revision
+            }
+        };Unit
+    }
     private val restoreKey=stringSetPreferencesKey("restore_prime_promos")
     suspend fun snapshotLedger():NotificationLedger {
         val prefs=context.notificationDataStore.data.first()
@@ -49,12 +58,17 @@ class NotificationPreferencesDataSource(private val context: Context) {
             @Suppress("UNCHECKED_CAST")
             if(id==null || !key.name.startsWith("notified_thresholds_")) null else id to (value as Set<String>)
         }.toMap()
-        return NotificationLedger(rows,prefs[restoreKey].orEmpty().mapNotNull {it.toLongOrNull()}.toSet())
+        val revisions=prefs.asMap().mapNotNull {(key,value)->
+            val id=key.name.removePrefix("correction_revision_").toLongOrNull()
+            if(key.name.startsWith("correction_revision_") && id!=null && value is Long) id to value else null
+        }.toMap()
+        return NotificationLedger(rows,prefs[restoreKey].orEmpty().mapNotNull {it.toLongOrNull()}.toSet(),revisions)
     }
     suspend fun replaceLedger(ledger:NotificationLedger) = com.loadpredictor.domain.sync.DataOperationGate.exclusive {
         context.notificationDataStore.edit {p->
             p.clear()
             ledger.milestones.forEach {(id,keys)->if(keys.isNotEmpty())p[stringSetPreferencesKey("notified_thresholds_$id")]=keys}
+            ledger.correctionRevisions.forEach {(id,revision)->p[androidx.datastore.preferences.core.longPreferencesKey("correction_revision_$id")]=revision}
             if(ledger.pendingRestore.isNotEmpty())p[restoreKey]=ledger.pendingRestore.map {it.toString()}.toSet()
         };Unit
     }
